@@ -1,0 +1,3 @@
+[submodule "backbones/InternImage"]
+	path = backbones/InternImage
+	url = git@git.sinomo.net:pdml/internimage.git
