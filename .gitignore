@@ -1,5 +1,6 @@
-datasets/
+/datasets/
 
+temp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
