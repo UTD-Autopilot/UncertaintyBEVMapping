@@ -1,0 +1,11 @@
+__pycache__
+VOCdevkit
+.vscode
+*.pyc
+.idea/
+__pycache__
+/results*
+cityscapes
+test_results
+/runs*
+/checkpoints*
