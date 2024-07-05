@@ -128,9 +128,10 @@ def train_muad_ood(
     random.seed(seed)
 
     writer = SummaryWriter()
-
+    # 1024x2048 -> resize to 900x1800 -> crop from center to 900x1600 -> resize to 450x800
     train_transform = et.ExtCompose([
-        et.ExtResize((512, 1024)),
+        et.ExtResize((450, 900)),
+        et.ExtCenterCrop((450, 800)),
         # et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size)),
         et.ExtColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
         et.ExtRandomHorizontalFlip(),
@@ -140,7 +141,8 @@ def train_muad_ood(
     ])
 
     val_transform = et.ExtCompose([
-        et.ExtResize((512, 1024)),
+        et.ExtResize((450, 900)),
+        et.ExtCenterCrop((450, 800)),
         et.ExtToTensor(),
         et.ExtNormalize(mean=[0.485, 0.456, 0.406],
                         std=[0.229, 0.224, 0.225]),
