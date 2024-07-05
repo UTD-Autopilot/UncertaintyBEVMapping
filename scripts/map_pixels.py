@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 from scipy.spatial import Delaunay
 import tqdm
+import argparse
 
 DEPTH_CAMERA_FAR_PLANE = 1000.00
 
@@ -74,13 +75,13 @@ def points_to_bev(points: np.ndarray, payload: np.ndarray, bev_range, bev_size_y
     for triangle in triang:
         draw.polygon([tuple(pixel_coords[triangle[0]]), tuple(pixel_coords[triangle[1]]), tuple(pixel_coords[triangle[2]])], fill = tuple(payload[triangle[0]].astype(np.int32)))
 
-    bg.save(f'temp/triangles_{save_suffix}.png')
+    bg.save(f'tmp/triangles_{save_suffix}.png')
     fg = Image.fromarray(img, 'RGBA')
     x, y = ((bg.width - fg.width) // 2 , (bg.height - fg.height) // 2)
     bg.paste(fg, (x, y), fg)
 
-    fg.save(f'temp/pixels_{save_suffix}.png')
-    bg.save(f'temp/bev_{save_suffix}.png')
+    fg.save(f'tmp/pixels_{save_suffix}.png')
+    bg.save(f'tmp/bev_{save_suffix}.png')
     return np.array(bg)
 
 def to_right_handed(points: np.ndarray):
@@ -133,7 +134,7 @@ def bev_map_frame(agent_path, frame):
 
         img_path = os.path.join(agent_path, f'{camera}/{frame}.png')
         semantic_path = os.path.join(agent_path, f'{semantic_camera}/{frame}.png')
-        depth_path = os.path.join(agent_path, f'{depth_camera}/{frame}.pkl')
+        depth_path = os.path.join(agent_path, f'{depth_camera}/{frame}.npz')
 
         with Image.open(img_path) as pil_img:
             pixels = np.array(pil_img)
@@ -142,7 +143,7 @@ def bev_map_frame(agent_path, frame):
             semantic_pixels = np.array(pil_img)
         
         with open(depth_path, 'rb') as f:
-            depth = pickle.load(f)
+            depth = np.load(f)['data']
 
         camera_xyz = pixels_to_point_cloud(depth, intrinsic)
         camera_xyz1 = np.concatenate([camera_xyz, np.ones((*camera_xyz.shape[:-1], 1))], axis=-1).T
@@ -173,44 +174,37 @@ def bev_map_frame(agent_path, frame):
     all_semantic_pixels = np.concatenate(all_semantic_pixels, axis=0)
 
     bev_image = points_to_bev(all_points, all_semantic_pixels, bev_range=50.0, save_suffix=f'{frame}')
-    rr.log(f'bev_semantic_map/reconstruct', rr.ImageEncoded(path=f'temp/bev_{frame}.png'))
-    rr.log(f'bev_semantic_map/pixels', rr.ImageEncoded(path=f'temp/pixels_{frame}.png'))
-    rr.log(f'bev_semantic_map/triangles', rr.ImageEncoded(path=f'temp/triangles_{frame}.png'))
+    rr.log(f'bev_semantic_map/reconstruct', rr.ImageEncoded(path=f'tmp/bev_{frame}.png'))
+    rr.log(f'bev_semantic_map/pixels', rr.ImageEncoded(path=f'tmp/pixels_{frame}.png'))
+    rr.log(f'bev_semantic_map/triangles', rr.ImageEncoded(path=f'tmp/triangles_{frame}.png'))
     rr.log(f'bev_semantic_map/gt', rr.ImageEncoded(path=os.path.join(agent_path, 'birds_view_semantic_camera', f'{frame}.png')))
     rr.log(f'bev_range', rr.Boxes3D(centers=[0, 0, 0], half_sizes=[50.0, 50.0, 1.0]))
 
-if __name__ == '__main__':
-    rr.init('map_pixels_debug')
-    dataset_path = '../datasets/carla/depth_test_2'
+def main():
+    parser = argparse.ArgumentParser(
+        prog='Depth based BEV mapper',
+    )
+
+    parser.add_argument('dataset_path', type=str, help='path to the dataset')
+    parser.add_argument('output_path', type=str, help='output file path')
+
+    args = parser.parse_args()
+    dataset_path = args.dataset_path # '../../Datasets/carla/Town01_1'
+    output_path = args.output_path
+
+    output_filename = os.path.basename(output_path)
+
+    rr.init(output_filename)
+    
     agent_path = os.path.join(dataset_path, 'agents/0')
     frames = list(map(lambda s: int(s.split('.')[0]), os.listdir(os.path.join(agent_path, 'front_camera'))))
 
+    os.makedirs('tmp', exist_ok=True)
     for frame in tqdm.tqdm(frames):
         bev_map_frame(agent_path, frame)
 
-    rr.save('map_pixels_debug_2.rrd')
+    rr.save(output_path)
 
-    # import matplotlib.pyplot as plt
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
-    # points = image_xyz.reshape(-1, 3)[::100]
-    # ax.scatter(points[:, 0], points[:, 1], points[:, 2])
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # plt.savefig('image_xyz.png')
-    # plt.close()
-
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
-    # points = vehicle_xyz.reshape(-1, 3)[::100]
-    # color = pixels.reshape(-1, 3)[::100] / 255.0
-    # ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color)
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # # ax.set_xlim(-100, 100)
-    # # ax.set_ylim(-100, 100)
-    # # ax.set_zlim(-100, 100)
-    # plt.savefig('vehicle_xyz.png')
-    # plt.close()
+# python scripts/map_pixels.py ../../Datasets/carla/Town01_1 outputs/mapping/Town01_1.rrd
+if __name__ == '__main__':
+    main()

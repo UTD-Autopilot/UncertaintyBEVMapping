@@ -16,7 +16,7 @@ pyyaml
 scipy
 yapf==0.40.1    # for mmdet compatibility
 pillow
-rerun
+rerun-sdk
 tqdm
 matplotlib
 scikit-learn
