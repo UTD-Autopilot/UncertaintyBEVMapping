@@ -193,6 +193,8 @@ def main():
     output_path = args.output_path
 
     output_filename = os.path.basename(output_path)
+    output_dir = os.path.dirname(output_path)
+    os.makedirs(output_dir, exist_ok=True)
 
     rr.init(output_filename)
     

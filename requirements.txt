@@ -20,3 +20,5 @@ rerun-sdk
 tqdm
 matplotlib
 scikit-learn
+plotly
+kaleido
