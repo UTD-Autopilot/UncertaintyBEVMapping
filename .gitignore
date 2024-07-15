@@ -25,3 +25,6 @@ venv.bak/
 
 # Cython debug symbols
 cython_debug/
+
+# Egg file
+*.egg-info/
