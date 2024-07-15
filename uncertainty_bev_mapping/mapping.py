@@ -73,7 +73,7 @@ def points_to_bev(points: np.ndarray, payload: np.ndarray, bev_range, bev_size_y
 
     # It's possible that there's no point when caller trying to map only one class and that class does not appear in the image.
     # scipy.spatial.Delaunay will raise ValueError otherwise
-    if points.shape[0] > 0:
+    if points.shape[0] >= 3:
         triang = Delaunay(points).simplices
     else:
         triang = []

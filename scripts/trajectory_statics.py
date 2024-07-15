@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import plotly.graph_objects as go
 
-def collect_ego_trajectory(dataset_path, distance_to_obstacle_considering_an_avoidance=10.0) -> (dict[str, np.ndarray], np.ndarray):
+def collect_ego_trajectory(dataset_path, distance_to_obstacle_considering_an_avoidance=10.0) -> tuple[dict[str, np.ndarray], np.ndarray]:
     trajectories = {}
     obstacles = {}
     statics = {}

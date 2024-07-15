@@ -21,6 +21,7 @@ def main():
     args = parser.parse_args()
     dataset_path = args.dataset_path # '../../Datasets/carla/Town01_1'
     output_path = args.output_path
+    ignore_existing = True
 
     log_to_rerun = args.rerun
 
@@ -49,6 +50,8 @@ def main():
         # Multiprocessing
         args = []
         for frame in frames:
+            if ignore_existing and os.path.exists(os.path.join(agent_path, 'bev_mapping', f'bev_{frame}.png')):
+                continue
             args.append(((agent_path, frame), dict(save_path=output_path)))
         process_map(bev_map_frame_with_color_priority_wrapper, args)
 
