@@ -204,9 +204,9 @@ def train_muad_ood(
     ], lr=lr, momentum=0.9, weight_decay=weight_decay)
 
     scheduler = utils.PolyLR(optimizer, max_steps, power=0.9)
-    criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
+    # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
     class_weights = torch.tensor(train_dataset.training_class_weights, device=device)
-    # criterion = UCELoss(num_classes, weights=class_weights)
+    criterion = UCELoss(num_classes, weights=class_weights)
 
     def save_ckpt(path):
         """ save current model
@@ -317,4 +317,4 @@ def train_muad_ood(
 
 if __name__ == '__main__':
     # train_muad_ood('../../Datasets/MUAD/train+val+tests', 'muad')
-    train_muad_ood('~/data/Datasets/carla', 'carla')
+    train_muad_ood('~/Datasets/carla', 'carla')
