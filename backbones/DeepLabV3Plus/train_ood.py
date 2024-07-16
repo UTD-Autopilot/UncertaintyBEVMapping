@@ -8,6 +8,7 @@ import numpy as np
 
 from torch.utils import data
 from datasets.muad import MUADDataset
+from datasets.carla import CarlaDataset
 from utils import ext_transforms as et
 from metrics import StreamSegMetrics
 from metrics.uncertainty import unc_iou, roc_pr
@@ -113,6 +114,7 @@ def validate(model, loader, device, criterion, metrics, save_val_results=True):
 
 def train_muad_ood(
         dataset_root,
+        dataset, # carla or muad
         model_name='deeplabv3plus_mobilenet',
         ckpt=None, load_ckpt=False,
         batch_size=8, lr=0.1, weight_decay=1e-5,
@@ -128,29 +130,53 @@ def train_muad_ood(
     random.seed(seed)
 
     writer = SummaryWriter()
-    # 1024x2048 -> resize to 900x1800 -> crop from center to 900x1600 -> resize to 450x800
-    train_transform = et.ExtCompose([
-        et.ExtResize((450, 900)),
-        et.ExtCenterCrop((450, 800)),
-        # et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size)),
-        et.ExtColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
-        et.ExtRandomHorizontalFlip(),
-        et.ExtToTensor(),
-        et.ExtNormalize(mean=[0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225]),
-    ])
 
-    val_transform = et.ExtCompose([
-        et.ExtResize((450, 900)),
-        et.ExtCenterCrop((450, 800)),
-        et.ExtToTensor(),
-        et.ExtNormalize(mean=[0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225]),
-    ])
+    if dataset == 'muad':
+        # 1024x2048 -> resize to 900x1800 -> crop from center to 900x1600 -> resize to 450x800
+        train_transform = et.ExtCompose([
+            et.ExtResize((450, 900)),
+            et.ExtCenterCrop((450, 800)),
+            # et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size)),
+            et.ExtColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
+            et.ExtRandomHorizontalFlip(),
+            et.ExtToTensor(),
+            et.ExtNormalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225]),
+        ])
 
-    train_dataset = MUADDataset(os.path.join(dataset_root, 'train'), transform=train_transform)
-    val_dataset = MUADDataset(os.path.join(dataset_root, 'test_sets/test_OOD'), transform=val_transform)
-    # test_dataset = MUADDataset(os.path.join(dataset_root, 'test_sets/test_level2'), transform=val_transform)
+        val_transform = et.ExtCompose([
+            et.ExtResize((450, 900)),
+            et.ExtCenterCrop((450, 800)),
+            et.ExtToTensor(),
+            et.ExtNormalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225]),
+        ])
+        train_dataset = MUADDataset(os.path.join(dataset_root, 'train'), transform=train_transform)
+        val_dataset = MUADDataset(os.path.join(dataset_root, 'test_sets/test_OOD'), transform=val_transform)
+        # test_dataset = MUADDataset(os.path.join(dataset_root, 'test_sets/test_level2'), transform=val_transform)
+    elif dataset == 'carla':
+        # 900x1600 -> resize to 450x800
+        train_transform = et.ExtCompose([
+            et.ExtResize((450, 800)),
+            # et.ExtRandomCrop(size=(opts.crop_size, opts.crop_size)),
+            et.ExtColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
+            et.ExtRandomHorizontalFlip(),
+            et.ExtToTensor(),
+            et.ExtNormalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225]),
+        ])
+
+        val_transform = et.ExtCompose([
+            et.ExtResize((450, 800)),
+            et.ExtToTensor(),
+            et.ExtNormalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225]),
+        ])
+
+        train_dataset = CarlaDataset(os.path.join(dataset_root, 'train'), transform=train_transform)
+        val_dataset = CarlaDataset(os.path.join(dataset_root, 'val'), transform=val_transform)
+    else:
+        raise ValueError(f'Dataset {dataset} not supported, must be one of [carla, muad]')
 
     num_classes = train_dataset.num_classes
 
@@ -178,9 +204,9 @@ def train_muad_ood(
     ], lr=lr, momentum=0.9, weight_decay=weight_decay)
 
     scheduler = utils.PolyLR(optimizer, max_steps, power=0.9)
-    # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
+    criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
     class_weights = torch.tensor(train_dataset.training_class_weights, device=device)
-    criterion = UCELoss(num_classes, weights=class_weights)
+    # criterion = UCELoss(num_classes, weights=class_weights)
 
     def save_ckpt(path):
         """ save current model
@@ -237,12 +263,15 @@ def train_muad_ood(
         for (images, labels, oods) in train_loader:
             cur_itrs += 1
 
+            # print(images.shape, labels.shape, oods.shape)
+
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
             oods = oods.to(device, dtype=torch.long)
 
             optimizer.zero_grad()
             outputs = model(images)
+            # print(outputs.shape, labels.shape)
             loss = criterion(outputs, labels)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 5.0)
@@ -287,4 +316,5 @@ def train_muad_ood(
                 return
 
 if __name__ == '__main__':
-    train_muad_ood(dataset_root='../../datasets/MUAD/train+val+tests')
+    # train_muad_ood('../../Datasets/MUAD/train+val+tests', 'muad')
+    train_muad_ood('~/data/Datasets/carla', 'carla')
