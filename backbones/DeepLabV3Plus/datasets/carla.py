@@ -136,8 +136,8 @@ class CarlaDataset(data.Dataset):
         image = Image.open(self.images[index]).convert('RGB')
         target = Image.open(self.labels[index]).convert('RGB')
         
-        label = map_color_dict(np.array(target), self.color_to_train_id, default=255, dtype=np.uint8)
-        ood = map_color_dict(np.array(target), self.color_to_ood_id, default=255, dtype=np.uint8)
+        label = map_color_dict(np.array(target), self.color_to_train_id, default=0, dtype=np.uint8)
+        ood = map_color_dict(np.array(target), self.color_to_ood_id, default=0, dtype=np.uint8)
 
         label = Image.fromarray(label)
         ood = Image.fromarray(ood)
