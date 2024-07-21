@@ -49,7 +49,7 @@ def points_to_bev(points: np.ndarray, payload: np.ndarray, bev_range, bev_size_y
 
     points = np.delete(points, points_not_in_range, axis=0)
     payload = np.delete(payload, points_not_in_range, axis=0)
-    
+
     # # flip image
     t = points[..., 1].copy()
     points[..., 1] = -points[..., 0]

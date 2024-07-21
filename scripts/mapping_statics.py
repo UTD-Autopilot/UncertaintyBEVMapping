@@ -135,7 +135,7 @@ def main():
         with open(os.path.join(output_path, f'{k}.json'), 'w') as f:
             json.dump(all_statics[k], f, indent=4)
     
-    aggregated_statics = aggregate_dicts(all_statics.values(), np.mean)
+    aggregated_statics = aggregate_dicts(list(all_statics.values()), np.mean)
     with open(os.path.join(output_path, f'aggregated.json'), 'w') as f:
         json.dump(aggregated_statics, f, indent=4)
 

@@ -2,12 +2,20 @@ import argparse
 import os
 import rerun as rr
 import tqdm
+import traceback
 from tqdm.contrib.concurrent import process_map
+from uncertainty_bev_mapping.utils import split_path_into_folders
 from uncertainty_bev_mapping.mapping import bev_map_frame
-from uncertainty_bev_mapping.bev_map_with_color_priority import bev_map_frame_with_color_priority
+from uncertainty_bev_mapping.bev_map_with_color_priority import bev_map_frame_with_color_priority, bev_map_frame_with_color_priority_uncertainty
 
 def bev_map_frame_with_color_priority_wrapper(arg):
-    return bev_map_frame_with_color_priority(*arg[0], **arg[1])
+    # return bev_map_frame_with_color_priority(*arg[0], **arg[1])
+    try:
+        retval = bev_map_frame_with_color_priority_uncertainty(*arg[0], **arg[1])
+    except Exception as e:
+        traceback.print_exc(e)
+        retval = None
+    return retval
 
 def main():
     parser = argparse.ArgumentParser(
@@ -32,6 +40,12 @@ def main():
 
     for agent_path in agent_folders:
         print(f'Mapping {agent_path}')
+        splitted_path = split_path_into_folders(agent_path)
+        agent_id = splitted_path[-1]
+        town_name = splitted_path[-3]
+        uncertainty_data_path = f'~/data/Datasets/uncertainty-bev-mapping-main-backbones-DeepLabV3Plus/{town_name}/'
+        uncertainty_data_path = os.path.expanduser(uncertainty_data_path)
+
         if log_to_rerun:
             rerun_output_path = os.path.join(agent_path, f'bev_mapping.rrd')
             rerun_output_filename = os.path.basename(rerun_output_path)
@@ -45,14 +59,18 @@ def main():
         os.makedirs('tmp', exist_ok=True)
         # for frame in tqdm.tqdm(frames):
         #     # bev_map_frame(agent_path, frame)
-        #     bev_map_frame_with_color_priority(agent_path, frame, save_path=output_path)
-        
+        #     if ignore_existing and os.path.exists(os.path.join(agent_path, 'bev_mapping_aleatoric', f'{frame}.npy')):
+        #         continue
+        #     bev_map_frame_with_color_priority_uncertainty(agent_path, frame, uncertainty_data_path, save_path=output_path)
+
         # Multiprocessing
         args = []
         for frame in frames:
-            if ignore_existing and os.path.exists(os.path.join(agent_path, 'bev_mapping', f'bev_{frame}.png')):
+            # if ignore_existing and os.path.exists(os.path.join(agent_path, 'bev_mapping', f'bev_{frame}.png')):
+            if ignore_existing and os.path.exists(os.path.join(agent_path, 'bev_mapping_aleatoric', f'{frame}.npy')):
                 continue
-            args.append(((agent_path, frame), dict(save_path=output_path)))
+            # args.append(((agent_path, frame), dict(save_path=output_path)))
+            args.append(((agent_path, frame, uncertainty_data_path), dict(save_path=output_path)))
         process_map(bev_map_frame_with_color_priority_wrapper, args)
 
         if log_to_rerun:

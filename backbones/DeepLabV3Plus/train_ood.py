@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 
 from network.evidential import Evidential
-from utils.loss import UCELoss
+from utils.loss import UCELoss, entropy_reg
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -181,7 +181,7 @@ def train_muad_ood(
     num_classes = train_dataset.num_classes
 
     train_loader = data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, num_workers=2,
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, drop_last=True,
     )
     val_loader = data.DataLoader(
         val_dataset, batch_size=batch_size, shuffle=True, num_workers=2,
@@ -272,7 +272,7 @@ def train_muad_ood(
             optimizer.zero_grad()
             outputs = model(images)
             # print(outputs.shape, labels.shape)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels) + entropy_reg(outputs, beta_reg=0.001).mean()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             optimizer.step()
@@ -317,4 +317,4 @@ def train_muad_ood(
 
 if __name__ == '__main__':
     # train_muad_ood('../../Datasets/MUAD/train+val+tests', 'muad')
-    train_muad_ood('~/Datasets/carla', 'carla')
+    train_muad_ood('~/data/Datasets/carla', 'carla')
