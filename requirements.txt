@@ -23,3 +23,6 @@ matplotlib
 scikit-learn
 plotly
 kaleido
+efficientnet_pytorch
+pyquaternion
+nuscenes-devkit

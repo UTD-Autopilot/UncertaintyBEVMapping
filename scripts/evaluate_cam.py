@@ -67,30 +67,26 @@ def evaluate_bev_mapping(dataset_path, save_path):
             if not frame.endswith('.png'):
                 continue
             frame = frame.split('.png')[0]
-            bev_aleatoric_path = os.path.join(agent_path, f'bev_mapping_aleatoric/{frame}.npy')
-            bev_epistemic_path = os.path.join(agent_path, f'bev_mapping_epistemic/{frame}.npy')
-            bev_semantic_path = os.path.join(agent_path, f'birds_view_semantic_camera/{frame}.png')
-            bev_pred_path = os.path.join(agent_path, f'bev_mapping_pred/{frame}.png')
+            cam_aleatoric_path = os.path.join(agent_path, f'front_camera_uncertainty/{frame}_aleatoric.npy')
+            cam_epistemic_path = os.path.join(agent_path, f'front_camera_uncertainty/{frame}_epistemic.npy')
+            cam_semantic_path = os.path.join(agent_path, f'front_semantic_camera/{frame}.png')
 
-            bev_aleatoric = np.load(bev_aleatoric_path)
-            bev_epistemic = np.load(bev_epistemic_path)
+            if not os.path.exists(cam_aleatoric_path):
+                continue
+
+            aleatoric = np.load(cam_aleatoric_path)
+            epistemic = np.load(cam_epistemic_path)
             
-            bev_semantic_image = np.array(Image.open(bev_semantic_path))
-            bev_semantic_pred_image = np.array(Image.open(bev_pred_path))
+            semantic_image = np.array(Image.open(cam_semantic_path).resize((epistemic.shape[1], epistemic.shape[0]), resample=Image.Resampling.NEAREST))
 
-            bev_semantic_gt = carla_image_to_train_id(bev_semantic_image)
-            bev_ood_gt = calra_image_to_ood_id(bev_semantic_image)
+            semantic_gt = carla_image_to_train_id(semantic_image)
+            ood_gt = calra_image_to_ood_id(semantic_image)
 
-            bev_semantic_pred = carla_image_to_train_id(bev_semantic_pred_image)
-            iou = calc_iou(bev_semantic_pred, bev_semantic_gt, num_classes)
-
-            uncertainty_scores.append(bev_epistemic)
-            uncertainty_labels.append(bev_ood_gt==1) # Just calculate for the first class (animals)
+            uncertainty_scores.append(epistemic)
+            uncertainty_labels.append(ood_gt==1) # Just calculate for the first class (animals)
 
             num_frames += 1
-            all_iou.append(iou)
-    
-    pred_miou = np.mean(all_iou, axis=0)
+
     uncertainty_scores = np.array(uncertainty_scores)
     uncertainty_labels = np.array(uncertainty_labels)
 
@@ -99,7 +95,6 @@ def evaluate_bev_mapping(dataset_path, save_path):
     ood_pixels = int(np.sum(uncertainty_labels))
 
     results = {
-        'pred_miou': pred_miou.tolist(),
         'auroc': auroc,
         'aupr': aupr,
         'total_pixels': total_pixels,
@@ -128,9 +123,8 @@ def evaluate_bev_mapping(dataset_path, save_path):
     fig.savefig(os.path.join(save_path, f"ood_metrics.png"), format='png')
     fig.savefig(os.path.join(save_path, f"ood_metrics.svg"), format='svg')
 
-    return num_frames, pred_miou
-
 if __name__ == '__main__':
-    evaluate_bev_mapping('../../Datasets/carla/val', 'outputs/evaluate_bev_mapping/val')
-    evaluate_bev_mapping('../../Datasets/carla/test', 'outputs/evaluate_bev_mapping/test')
-    evaluate_bev_mapping('../../Datasets/carla/train', 'outputs/evaluate_bev_mapping/train')
+    # evaluate_bev_mapping('../../Datasets/carla/train', 'outputs/evaluate_cam_ood_tmp/train')
+    evaluate_bev_mapping('../../Datasets/carla/val', 'outputs/evaluate_cam_ood_tmp/val')
+    # evaluate_bev_mapping('../../Datasets/carla/test', 'outputs/evaluate_cam_ood/test')
+    # evaluate_bev_mapping('../../Datasets/carla/train', 'outputs/evaluate_cam_ood/train')
