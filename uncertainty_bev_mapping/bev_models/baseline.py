@@ -7,12 +7,12 @@ from .loss import ce_loss, focal_loss
 
 
 class Baseline(Model):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, m_in=-23.0, m_out=-5.0, ood_lambda=0.1, **kwargs):
         super(Baseline, self).__init__(*args, **kwargs)
 
-        self.m_in = -23.0
-        self.m_out = -5.0
-        self.ood_lambda = 0.1
+        self.m_in = m_in
+        self.m_out = m_out
+        self.ood_lambda = ood_lambda
 
     @staticmethod
     def aleatoric(logits, mode='entropy'):

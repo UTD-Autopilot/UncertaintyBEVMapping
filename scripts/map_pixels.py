@@ -43,8 +43,7 @@ def main():
         splitted_path = split_path_into_folders(agent_path)
         agent_id = splitted_path[-1]
         town_name = splitted_path[-3]
-        uncertainty_data_path = f'~/data/Datasets/uncertainty-bev-mapping-main-backbones-DeepLabV3Plus/{town_name}/'
-        uncertainty_data_path = os.path.expanduser(uncertainty_data_path)
+        uncertainty_data_path = agent_path
 
         if log_to_rerun:
             rerun_output_path = os.path.join(agent_path, f'bev_mapping.rrd')

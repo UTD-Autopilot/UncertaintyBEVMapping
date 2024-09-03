@@ -1,0 +1,16 @@
+type: evidential
+backbone: lss
+dataset: carla
+train_set: train
+val_set: val
+logdir: outputs/carla/lss_evidential_vehicle
+batch_size: 32
+learning_rate: 0.001
+weight_decay: 0.0000001
+num_epochs: 20
+loss: ce
+ood: true
+pos_class: 'vehicle'
+n_classes: 2
+classes: ['vehicle', 'background']
+weights: [2.0, 1.0]

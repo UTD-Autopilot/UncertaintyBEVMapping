@@ -19,12 +19,13 @@ warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 class NuScenesDataset(torch.utils.data.Dataset):
-    def __init__(self, nusc, is_train, pos_class, ind=False, ood=False, pseudo=False, yaw=180):
+    def __init__(self, nusc, is_train, pos_class, ind=False, ood=False, pseudo=False, yaw=180, map_uncertainty=False):
         self.ind = ind
         self.ood = ood
         self.pseudo = pseudo
         self.pos_class = pos_class
         self.yaw = yaw
+        # TODO: map uncertainty support
 
         self.dataroot = nusc.dataroot
 
@@ -291,7 +292,7 @@ def get_nusc(version, dataroot):
     return nusc, dataroot
 
 
-def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, seed=0, yaw=180, is_train=False):
+def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, seed=0, yaw=180, is_train=False, map_uncertainty=False):
     if set == "train":
         ind, ood, pseudo, is_train = True, False, False, True
     elif set == "val":
@@ -319,7 +320,7 @@ def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16
 
     nusc, dataroot = get_nusc("trainval", dataroot)
 
-    data = NuScenesDataset(nusc, is_train, pos_class, ind=ind, ood=ood, pseudo=pseudo, yaw=yaw)
+    data = NuScenesDataset(nusc, is_train, pos_class, ind=ind, ood=ood, pseudo=pseudo, yaw=yaw, map_uncertainty=False)
     random.seed(seed)
     torch.cuda.manual_seed(seed)
     torch.manual_seed(seed)

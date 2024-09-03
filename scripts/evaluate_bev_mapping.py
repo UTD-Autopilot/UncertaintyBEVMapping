@@ -132,5 +132,5 @@ def evaluate_bev_mapping(dataset_path, save_path):
 
 if __name__ == '__main__':
     evaluate_bev_mapping('../../Datasets/carla/val', 'outputs/evaluate_bev_mapping/val')
-    evaluate_bev_mapping('../../Datasets/carla/test', 'outputs/evaluate_bev_mapping/test')
-    evaluate_bev_mapping('../../Datasets/carla/train', 'outputs/evaluate_bev_mapping/train')
+    # evaluate_bev_mapping('../../Datasets/carla/test', 'outputs/evaluate_bev_mapping/test')
+    # evaluate_bev_mapping('../../Datasets/carla/train', 'outputs/evaluate_bev_mapping/train')

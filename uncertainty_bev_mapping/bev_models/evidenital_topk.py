@@ -1,14 +1,15 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+import einops
 from .model import Model
-from .loss import uce_loss, u_focal_loss, entropy_reg, ood_reg
+from .loss import uce_loss, u_focal_loss, entropy_reg, ood_reg_topk
 from .uncertainty import dissonance, vacuity
 
 
-class Evidential(Model):
+class EvidentialTopK(Model):
     def __init__(self, *args, beta_lambda=0.001, ood_lambda=0.01, k=64, **kwargs):
-        super(Evidential, self).__init__(*args, **kwargs)
+        super(EvidentialTopK, self).__init__(*args, **kwargs)
 
         self.beta_lambda = beta_lambda
         self.ood_lambda = ood_lambda
@@ -19,7 +20,7 @@ class Evidential(Model):
     @staticmethod
     def aleatoric(alpha, mode='dissonance'):
         if mode == 'aleatoric':
-            soft = Evidential.activate(alpha)
+            soft = EvidentialTopK.activate(alpha)
             max_soft, hard = soft.max(dim=1)
             return (1 - max_soft).unsqueeze(1)
         elif mode == 'dissonance':
@@ -46,22 +47,28 @@ class Evidential(Model):
         else:
             return A
 
-    def loss_ood(self, alpha, y, ood):
+    def loss_ood(self, alpha, y, ood, mapped_uncertainty, K=40):
         A = self.loss(alpha, y, reduction='none')
-        A *= 1 + (self.epistemic(alpha).detach() * self.k)
-
-        oreg = ood_reg(alpha, ood) * self.ood_lambda
+        # A *= 1 + (self.epistemic(alpha).detach() * self.k)
         A = A[~ood.bool()].mean()
+    
+        epistemic = self.epistemic(alpha)
+        top_k, top_k_idx = torch.topk(epistemic.reshape(epistemic.shape[0], -1), K)
+
+        reg_alpha = torch.gather(alpha.reshape(alpha.shape[0], alpha.shape[1], -1), 2, einops.repeat(top_k_idx, 'b k -> b c k', c=alpha.shape[1]))
+        reg_mapped_uncertainty = torch.gather(mapped_uncertainty.reshape(mapped_uncertainty.shape[0], -1), 1, top_k_idx)
+
+        oreg = ood_reg_topk(reg_alpha, reg_mapped_uncertainty) * self.ood_lambda
 
         A += oreg
 
         return A, oreg
 
-    def train_step_ood(self, images, intrinsics, extrinsics, labels, ood):
+    def train_step_ood(self, images, intrinsics, extrinsics, labels, ood, mapped_uncertainty):
         self.opt.zero_grad(set_to_none=True)
 
         outs = self(images, intrinsics, extrinsics)
-        loss, oodl = self.loss_ood(outs, labels.to(self.device), ood)
+        loss, oodl = self.loss_ood(outs, labels.to(self.device), ood, mapped_uncertainty.to(self.device))
         loss.backward()
         nn.utils.clip_grad_norm_(self.parameters(), 5.0)
         self.opt.step()

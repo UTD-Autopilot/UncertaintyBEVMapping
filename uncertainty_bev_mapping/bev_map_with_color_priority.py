@@ -197,10 +197,11 @@ def bev_map_frame_with_color_priority_uncertainty(agent_path, frame, uncertainty
         extrinsic = transform_to_matrix(x, y, z, roll, pitch, yaw)
 
         img_path = os.path.join(agent_path, f'{camera}/{frame}.png')
-        semantic_path = os.path.join(uncertainty_data_path, f'{camera}/{frame}_pred.png')
+        # semantic_path = os.path.join(uncertainty_data_path, f'{camera}_uncertainty/{frame}_pred.png')
+        semantic_path = os.path.join(agent_path, f'{semantic_camera}/{frame}.png')
         depth_path = os.path.join(agent_path, f'{depth_camera}/{frame}.npz')
-        aleatoric_path = os.path.join(uncertainty_data_path, f'{camera}/{frame}_aleatoric.npy')
-        epistemic_path = os.path.join(uncertainty_data_path, f'{camera}/{frame}_epistemic.npy')
+        aleatoric_path = os.path.join(uncertainty_data_path, f'{camera}_uncertainty/{frame}_aleatoric.npy')
+        epistemic_path = os.path.join(uncertainty_data_path, f'{camera}_uncertainty/{frame}_epistemic.npy')
 
         with Image.open(img_path) as pil_img:
             color = np.array(pil_img)
@@ -210,7 +211,7 @@ def bev_map_frame_with_color_priority_uncertainty(agent_path, frame, uncertainty
 
         with open(depth_path, 'rb') as f:
             depth = np.load(f)['data']
-        
+
         aleatoric_image = np.load(aleatoric_path)
         epistemic_image = np.load(epistemic_path)
 

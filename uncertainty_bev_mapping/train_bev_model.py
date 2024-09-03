@@ -3,6 +3,7 @@ import os
 import torch
 import numpy as np
 import tqdm
+import json
 
 from tensorboardX import SummaryWriter
 from .bev_models.metrics import get_iou, roc_pr
@@ -22,16 +23,21 @@ torch.backends.cudnn.enabled = True
 print(torch.__version__)
 
 @torch.no_grad()
-def run_loader(model, loader):
+def run_loader(model, loader, map_uncertainty=False):
     predictions = []
     ground_truth = []
     oods = []
     aleatoric = []
     epistemic = []
     raw = []
+    mapped_uncertainties = []
 
     with torch.no_grad():
-        for images, intrinsics, extrinsics, labels, ood in tqdm.tqdm(loader, desc="Running validation"):
+        for data in tqdm.tqdm(loader, desc="Running validation"):
+            if map_uncertainty:
+                images, intrinsics, extrinsics, labels, ood, mapped_uncertainty = data
+            else:
+                images, intrinsics, extrinsics, labels, ood = data
             outs = model(images, intrinsics, extrinsics).detach().cpu()
 
             predictions.append(model.activate(outs))
@@ -40,13 +46,24 @@ def run_loader(model, loader):
             aleatoric.append(model.aleatoric(outs))
             epistemic.append(model.epistemic(outs))
             raw.append(outs)
+            if map_uncertainty:
+                mapped_uncertainties.append(mapped_uncertainty)
 
-    return (torch.cat(predictions, dim=0),
-            torch.cat(ground_truth, dim=0),
-            torch.cat(oods, dim=0),
-            torch.cat(aleatoric, dim=0),
-            torch.cat(epistemic, dim=0),
-            torch.cat(raw, dim=0))
+    if map_uncertainty:
+        return (torch.cat(predictions, dim=0),
+                torch.cat(ground_truth, dim=0),
+                torch.cat(oods, dim=0),
+                torch.cat(aleatoric, dim=0),
+                torch.cat(epistemic, dim=0),
+                torch.cat(raw, dim=0),
+                torch.cat(mapped_uncertainties, dim=0))
+    else:
+        return (torch.cat(predictions, dim=0),
+                    torch.cat(ground_truth, dim=0),
+                    torch.cat(oods, dim=0),
+                    torch.cat(aleatoric, dim=0),
+                    torch.cat(epistemic, dim=0),
+                    torch.cat(raw, dim=0))
 
 
 def train(config, dataroot, split='trainval'):
@@ -67,13 +84,16 @@ def train(config, dataroot, split='trainval'):
     elif config['backbone'] == 'cvt':
         yaw = 180
 
+    map_uncertainty = config['map_uncertainty'] if 'map_uncertainty' in config else False
+
     train_loader = datasets[config['dataset']](
         train_set, split, dataroot, config['pos_class'],
         batch_size=config['batch_size'],
         num_workers=config['num_workers'],
         is_train=True,
         seed=config['seed'],
-        yaw=yaw
+        yaw=yaw,
+        map_uncertainty=map_uncertainty,
     )
 
     val_loader = datasets[config['dataset']](
@@ -82,15 +102,23 @@ def train(config, dataroot, split='trainval'):
         num_workers=config['num_workers'],
         is_train=False,
         seed=config['seed'],
-        yaw=yaw
+        yaw=yaw,
+        map_uncertainty=map_uncertainty,
     )
+
+    model_args = {}
+    if 'model' in config:
+        model_args.update(config['model'])
+    print('model_args:')
+    print(json.dumps(model_args, indent=4))
 
     model = models[config['type']](
         config['gpus'],
         backbone=config['backbone'],
         n_classes=n_classes,
         loss_type=config['loss'],
-        weights=weights
+        weights=weights,
+        **model_args,
     )
 
     model.opt = torch.optim.Adam(
@@ -114,38 +142,22 @@ def train(config, dataroot, split='trainval'):
             steps_per_epoch=len(train_loader.dataset) // config['batch_size']
         )
 
-    if 'gamma' in config:
-        model.gamma = config['gamma']
-        print(f"GAMMA: {model.gamma}")
-
-    if 'ol' in config:
-        model.ood_lambda = config['ol']
-        print(f"OOD LAMBDA: {model.ood_lambda}")
-
-    if 'k' in config:
-        model.k = config['k']
-
-    if 'beta' in config:
-        model.beta_lambda = config['beta']
-        print(f"Beta lambda is {model.beta_lambda}")
-
-    if 'm_in' in config:
-        model.m_in = config['m_in']
-    if 'm_out' in config:
-        model.m_out = config['m_out']
-
     print("--------------------------------------------------")
     print(f"Using GPUS: {config['gpus']}")
     print(f"Train loader: {len(train_loader.dataset)}")
     print(f"Val loader: {len(val_loader.dataset)}")
+    print(f"Train set: {train_set} Val set: {val_set}")
     print(f"Batch size: {config['batch_size']}")
     print(f"Output directory: {config['logdir']} ")
     print(f"Using loss {config['loss']}")
+    print(f"Use mapped uncertainty as regularization: {map_uncertainty}")
     print("--------------------------------------------------")
 
     writer = SummaryWriter(logdir=config['logdir'])
 
     writer.add_text("config", str(config))
+    with open((os.path.join(config['logdir'], f'config.json')), 'w') as f:
+        json.dump(config, f, indent=4)
 
     step = 0
 
@@ -157,12 +169,19 @@ def train(config, dataroot, split='trainval'):
 
         writer.add_scalar('train/epoch', epoch, step)
 
-        for images, intrinsics, extrinsics, labels, ood in train_loader:
+        for data in train_loader:
+            if map_uncertainty:
+                images, intrinsics, extrinsics, labels, ood, mapped_uncertainty = data
+            else:
+                images, intrinsics, extrinsics, labels, ood = data
             t_0 = time()
             ood_loss = None
 
             if config['ood']:
-                outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood)
+                if map_uncertainty:
+                    outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty)
+                else:
+                    outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood)
             else:
                 outs, preds, loss = model.train_step(images, intrinsics, extrinsics, labels)
 
@@ -195,7 +214,11 @@ def train(config, dataroot, split='trainval'):
 
         model.eval()
 
-        predictions, ground_truth, oods, aleatoric, epistemic, raw = run_loader(model, val_loader)
+        if map_uncertainty:
+            predictions, ground_truth, oods, aleatoric, epistemic, raw, mapped_uncertainty = run_loader(model, val_loader, map_uncertainty=map_uncertainty)
+        else:
+            predictions, ground_truth, oods, aleatoric, epistemic, raw = run_loader(model, val_loader, map_uncertainty=map_uncertainty)
+
         iou = get_iou(predictions, ground_truth)
 
         for i in range(0, n_classes):
@@ -214,8 +237,13 @@ def train(config, dataroot, split='trainval'):
                 raw_batch = raw[i:i + config['batch_size']].to(model.device)
                 ground_truth_batch = ground_truth[i:i + config['batch_size']].to(model.device)
                 oods_batch = oods[i:i + config['batch_size']].to(model.device)
+                if map_uncertainty:
+                    mapped_uncertainty_batch = mapped_uncertainty[i:i + config['batch_size']].to(model.device)
 
-                vl, ol = model.loss_ood(raw_batch, ground_truth_batch, oods_batch)
+                if map_uncertainty:
+                    vl, ol = model.loss_ood(raw_batch, ground_truth_batch, oods_batch, mapped_uncertainty_batch)
+                else:
+                    vl, ol = model.loss_ood(raw_batch, ground_truth_batch, oods_batch)
 
                 val_loss += vl
                 ood_loss += ol
@@ -235,6 +263,12 @@ def train(config, dataroot, split='trainval'):
             writer.add_scalar('val/ood_aupr', aupr, epoch)
 
             print(f'Validation OOD: AUPR={aupr}, AUROC={auroc}')
+
+            if map_uncertainty:
+                fpr, tpr, rec, pr, auroc, aupr, _ = roc_pr(mapped_uncertainty[:256].squeeze(1), uncertainty_labels)
+                writer.add_scalar(f"val/mapped_ood_auroc", auroc, epoch)
+                writer.add_scalar(f"val/mapped_ood_aupr", aupr, epoch)
+
         else:
             n_samples = len(raw)
             val_loss = 0

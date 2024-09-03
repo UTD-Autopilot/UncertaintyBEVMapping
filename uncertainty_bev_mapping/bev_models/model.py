@@ -11,7 +11,7 @@ backbones = {
 
 
 class Model(nn.Module):
-    def __init__(self, devices, backbone='lss', n_classes=4, opt=None, scaler=None, loss_type='ce', weights=None):
+    def __init__(self, devices, backbone='lss', n_classes=4, opt=None, scaler=None, loss_type='ce', weights=None, gamma=0.1):
         super(Model, self).__init__()
 
         self.device = devices[0]
@@ -28,7 +28,7 @@ class Model(nn.Module):
         self.n_classes = n_classes
         self.opt = opt
         self.scaler = scaler
-        self.gamma = .1
+        self.gamma = gamma
         self.tsne = False
 
         self.create_backbone(backbone)
