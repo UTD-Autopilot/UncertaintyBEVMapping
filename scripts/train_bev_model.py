@@ -52,6 +52,6 @@ if __name__ == "__main__":
 
         pynvml.nvmlShutdown()
 
-    dataroot = f"../data/{config['dataset']}"
+    dataroot = f"../../Datasets/{config['dataset']}"
 
     train(config, dataroot)
