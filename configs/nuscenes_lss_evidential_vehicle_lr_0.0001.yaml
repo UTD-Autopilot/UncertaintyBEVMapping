@@ -3,11 +3,11 @@ backbone: lss
 dataset: nuscenes
 train_set: train
 val_set: val
-logdir: outputs/nuscenes/lss_evidential_vehicle
+logdir: outputs/nuscenes/lss_evidential_vehicle_lr_0.0001
 batch_size: 32
-learning_rate: 0.001
+learning_rate: 0.0001
 weight_decay: 0.0000001
-num_epochs: 40
+num_epochs: 20
 loss: ce
 ood: true
 pos_class: 'vehicle'

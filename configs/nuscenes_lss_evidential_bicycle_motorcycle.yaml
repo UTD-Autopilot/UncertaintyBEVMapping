@@ -3,14 +3,14 @@ backbone: lss
 dataset: nuscenes
 train_set: train
 val_set: val
-logdir: outputs/nuscenes/lss_evidential_vehicle
+logdir: outputs/nuscenes/lss_evidential_bicycle_motorcycle
 batch_size: 32
 learning_rate: 0.001
 weight_decay: 0.0000001
 num_epochs: 40
 loss: ce
-ood: true
-pos_class: 'vehicle'
+ood: false
+pos_class: 'debug_bicycle_motorcycle'
 n_classes: 2
-classes: ['vehicle', 'background']
+classes: ['bicycle_motorcycle', 'background']
 weights: [2.0, 1.0]
