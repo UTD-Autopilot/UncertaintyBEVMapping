@@ -1,10 +1,10 @@
-type: evidential
+type: baseline
 backbone: lss
 dataset: nuscenes
-train_set: train
-val_set: val
-logdir: outputs/nuscenes/lss_evidential_bicycle_motorcycle
-batch_size: 32
+train_set: train_comb
+val_set: val_comb
+logdir: outputs/nuscenes/lss_baseline_bicycle_motorcycle
+batch_size: 16
 learning_rate: 0.001
 weight_decay: 0.0000001
 num_epochs: 40
@@ -13,4 +13,4 @@ ood: false
 pos_class: 'debug_bicycle_motorcycle'
 n_classes: 2
 classes: ['bicycle_motorcycle', 'background']
-weights: [2.0, 1.0]
+weights: [100.0, 1.0]

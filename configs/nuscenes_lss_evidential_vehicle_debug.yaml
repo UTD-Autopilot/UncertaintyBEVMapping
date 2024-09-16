@@ -1,8 +1,8 @@
 type: evidential
 backbone: lss
 dataset: nuscenes
-train_set: train
-val_set: val
+train_set: train_comb
+val_set: val_comb
 logdir: outputs/nuscenes/lss_evidential_vehicle_debug
 batch_size: 16
 learning_rate: 0.001
