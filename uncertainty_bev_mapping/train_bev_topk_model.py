@@ -155,32 +155,33 @@ def train(config, dataroot, split='trainval'):
 
             if config['ood']:
                 raise NotImplementedError('Not implemented')
-                outs, preds, loss, ood_loss, lambda_t = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
+                # outs, preds, loss, ood_loss, lambda_t = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
             else:
-                model.opt.zero_grad(set_to_none=True)
-                lr = get_lr(model.opt)
-                outs = model(images, intrinsics, extrinsics)
-                ce = model.loss(outs, mapped_labels.to(model.device))
+                with torch.autograd.detect_anomaly():
+                    model.opt.zero_grad(set_to_none=True)
+                    lr = get_lr(model.opt)
+                    outs = model(images, intrinsics, extrinsics)
+                    ce = model.loss(outs, mapped_labels.to(model.device))
 
-                mask = (ce > lambda_t)
+                    mask = (ce > lambda_t)
 
-                ce[mask] = 0.0
+                    ce[mask] = 0.0
 
-                loss = ce.mean()
+                    loss = ce.mean()
 
-                num_pixels_N = outs.shape[2]*outs.shape[3]
-                num_frames_L = outs.shape[0]
-                lambda_t_plus = max(
-                    0,
-                    lambda_t - lambda_step_length*((top_k / (num_pixels_N*num_frames_L)) - mask.float().mean())
-                )
-                lambda_t_plus = min(max(lambda_t_plus, 0), lambda_max)
+                    num_pixels_N = outs.shape[2]*outs.shape[3]
+                    num_frames_L = outs.shape[0]
+                    lambda_t_plus = max(
+                        0,
+                        lambda_t - lambda_step_length*((top_k / (num_pixels_N*num_frames_L)) - mask.float().mean())
+                    )
+                    lambda_t_plus = min(max(lambda_t_plus, 0), lambda_max)
 
-                loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), 5.0)
-                model.opt.step()
+                    loss.backward()
+                    nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                    model.opt.step()
 
-                preds = model.activate(outs)
+                    preds = model.activate(outs)
 
             step += 1
 
@@ -197,8 +198,8 @@ def train(config, dataroot, split='trainval'):
                     writer.add_scalar('train/ood_loss', ood_loss, step)
                     writer.add_scalar('train/id_loss', loss-ood_loss, step)
                 
-                writer.add_scalar('train/lambda_t', lambda_t)
-                writer.add_scalar('train/lambda_t_plus', lambda_t_plus)
+                writer.add_scalar('train/step_lambda_t', lambda_t, step)
+                writer.add_scalar('train/step_lambda_t_plus', lambda_t_plus, step)
 
                 if config['ood']:
                     epistemic = model.epistemic(outs)
@@ -224,10 +225,11 @@ def train(config, dataroot, split='trainval'):
                 for i in range(0, n_classes):
                     writer.add_scalar(f'train/{classes[i]}_iou', iou[i], step)
 
+        writer.add_scalar('train/lambda_t', lambda_t, epoch)
+        writer.add_scalar('train/lambda_t_plus', lambda_t_plus, epoch)
+
         # Update lambda_t
         lambda_t = lambda_t_plus
-
-        writer.add_scalar('train/lambda_t', lambda_t, epoch)
 
         aupr = np.mean(total_aupr)
         auroc = np.mean(total_auroc)

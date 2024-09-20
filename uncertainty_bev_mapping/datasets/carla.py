@@ -186,6 +186,8 @@ class CarlaDataset(torch.utils.data.Dataset):
         label = np.array(label_r)
         label_r.close()
 
+        label, ood = self.semantic_rgb_to_label(label)
+
         if self.map_uncertainty:
             mapped_epistemic = np.load(os.path.join(agent_path, "bev_mapping_epistemic", f'{index}.npy'))
             if mapped_epistemic.shape != (200, 200):
@@ -196,12 +198,10 @@ class CarlaDataset(torch.utils.data.Dataset):
                 mapped_label_r = mapped_label_r.resize((200, 200), Image.Resampling.NEAREST)
             mapped_label = np.array(mapped_label_r)
             mapped_label_r.close()
+            mapped_label, _ = self.semantic_rgb_to_label(mapped_label)
         else:
             mapped_epistemic = None
             mapped_label = None
-
-        label, ood = self.semantic_rgb_to_label(label)
-        mapped_label, _ = self.semantic_rgb_to_label(mapped_label)
 
         return label, ood[None], mapped_epistemic, mapped_label
 
