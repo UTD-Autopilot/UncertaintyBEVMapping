@@ -33,5 +33,17 @@
                 "0"
             ]
         },
+        {
+            "name": "train_bev_topk_model.py configs/carla_lss_baseline_topk_vehicle.yaml",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/train_bev_topk_model.py",
+            "console": "integratedTerminal",
+            "args": [
+                "configs/carla_lss_baseline_topk_vehicle.yaml",
+                "-g",
+                "1", "2"
+            ]
+        },
     ]
 }

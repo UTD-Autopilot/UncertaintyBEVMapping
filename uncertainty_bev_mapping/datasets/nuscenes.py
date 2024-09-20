@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 class NuScenesDataset(torch.utils.data.Dataset):
-    def __init__(self, nusc, is_train, pos_class, ind=False, ood=False, pseudo=False, yaw=180):
+    def __init__(self, nusc, is_train, pos_class, ind=False, ood=False, pseudo=False, yaw=180, map_uncertainty=False):
         self.ind = ind
         self.ood = ood
         self.pseudo = pseudo
@@ -109,7 +109,7 @@ class NuScenesDataset(torch.utils.data.Dataset):
                 records.append(rec)
             if self.ood and is_true_ood:
                 records.append(rec)
-            if self.pseudo and is_pseudo_ood:
+            if self.pseudo and is_pseudo_ood and not is_true_ood:
                 records.append(rec)
 
         return records
@@ -197,7 +197,6 @@ class NuScenesDataset(torch.utils.data.Dataset):
         rot = Quaternion(egopose['rotation']).inverse
 
         vehicles = np.zeros(self.bev_dimension[:2])
-        bicycle_motorcycle = np.zeros(self.bev_dimension[:2])
         ood = np.zeros(self.bev_dimension[:2])
 
         for token in rec['anns']:
@@ -206,10 +205,6 @@ class NuScenesDataset(torch.utils.data.Dataset):
             if 'vehicle' in inst['category_name']:
                 pts, _ = self.get_region(inst, trans, rot)
                 cv2.fillPoly(vehicles, [pts], 1.0)
-            
-            if inst['category_name'] in ['vehicle.bicycle', 'static_object.bicycle_rack', 'vehicle.motorcycle']:
-                pts, _ = self.get_region(inst, trans, rot)
-                cv2.fillPoly(bicycle_motorcycle, [pts], 1.0)
 
             if inst['category_name'] in self.all_ood:
                 pts, _ = self.get_region(inst, trans, rot)
@@ -228,9 +223,6 @@ class NuScenesDataset(torch.utils.data.Dataset):
         elif self.pos_class == 'lane':
             empty[lane == 1] = 0
             label = np.stack((lane, empty))
-        elif self.pos_class == 'debug_bicycle_motorcycle':
-            empty[bicycle_motorcycle == 1] = 0
-            label = np.stack((bicycle_motorcycle, empty))
         elif self.pos_class == 'all':
             empty[vehicles == 1] = 0
             empty[lane == 1] = 0

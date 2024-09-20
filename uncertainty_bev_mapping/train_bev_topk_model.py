@@ -1,6 +1,7 @@
 from time import time, sleep
 import os
 import torch
+from torch import nn
 import numpy as np
 import tqdm
 
@@ -21,33 +22,9 @@ torch.backends.cudnn.enabled = True
 
 print(torch.__version__)
 
-@torch.no_grad()
-def run_loader(model, loader):
-    predictions = []
-    ground_truth = []
-    oods = []
-    aleatoric = []
-    epistemic = []
-    raw = []
-
-    with torch.no_grad():
-        for images, intrinsics, extrinsics, labels, ood in tqdm.tqdm(loader, desc="Running validation"):
-            outs = model(images, intrinsics, extrinsics).detach().cpu()
-
-            predictions.append(model.activate(outs))
-            ground_truth.append(labels)
-            oods.append(ood)
-            aleatoric.append(model.aleatoric(outs))
-            epistemic.append(model.epistemic(outs))
-            raw.append(outs)
-
-    return (torch.cat(predictions, dim=0),
-            torch.cat(ground_truth, dim=0),
-            torch.cat(oods, dim=0),
-            torch.cat(aleatoric, dim=0),
-            torch.cat(epistemic, dim=0),
-            torch.cat(raw, dim=0))
-
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
 
 def train(config, dataroot, split='trainval'):
 
@@ -67,8 +44,6 @@ def train(config, dataroot, split='trainval'):
     elif config['backbone'] == 'cvt':
         yaw = 180
 
-    map_uncertainty = config['type'].endswith('_topk')
-
     train_loader = datasets[config['dataset']](
         train_set, split, dataroot, config['pos_class'],
         batch_size=config['batch_size'],
@@ -76,7 +51,7 @@ def train(config, dataroot, split='trainval'):
         is_train=True,
         seed=config['seed'],
         yaw=yaw,
-        map_uncertainty=map_uncertainty,
+        map_uncertainty=True,
     )
 
     val_loader = datasets[config['dataset']](
@@ -86,7 +61,7 @@ def train(config, dataroot, split='trainval'):
         is_train=False,
         seed=config['seed'],
         yaw=yaw,
-        map_uncertainty=map_uncertainty,
+        map_uncertainty=True,
     )
 
     model = models[config['type']](
@@ -138,6 +113,8 @@ def train(config, dataroot, split='trainval'):
     if 'm_out' in config:
         model.m_out = config['m_out']
 
+    top_k = config['top_k']
+
     print("--------------------------------------------q------")
     print(f"Using GPUS: {config['gpus']}")
     print(f"Train loader: {len(train_loader.dataset)}")
@@ -156,6 +133,10 @@ def train(config, dataroot, split='trainval'):
     # enable to catch errors in loss function
     # torch.autograd.set_detect_anomaly(True)
 
+    lambda_max = 1.0
+    lambda_t = lambda_max
+    lambda_t_plus = 0.0
+
     for epoch in range(config['num_epochs']):
         model.train()
 
@@ -164,22 +145,42 @@ def train(config, dataroot, split='trainval'):
         total_aupr = []
         total_auroc = []
 
+        lambda_step_length = 1 / np.sqrt(epoch+1)
+
         for data in train_loader:
-            if map_uncertainty:
-                images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels = data
-            else:
-                images, intrinsics, extrinsics, labels, ood = data
+            images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels = data
 
             t_0 = time()
             ood_loss = None
 
             if config['ood']:
-                if map_uncertainty:
-                    outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
-                else:
-                    outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood)
+                raise NotImplementedError('Not implemented')
+                outs, preds, loss, ood_loss, lambda_t = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
             else:
-                outs, preds, loss = model.train_step(images, intrinsics, extrinsics, labels)
+                model.opt.zero_grad(set_to_none=True)
+                lr = get_lr(model.opt)
+                outs = model(images, intrinsics, extrinsics)
+                ce = model.loss(outs, mapped_labels.to(model.device))
+
+                mask = (ce > lambda_t)
+
+                ce[mask] = 0.0
+
+                loss = ce.mean()
+
+                num_pixels_N = outs.shape[2]*outs.shape[3]
+                num_frames_L = outs.shape[0]
+                lambda_t_plus = max(
+                    0,
+                    lambda_t - lambda_step_length*((top_k / (num_pixels_N*num_frames_L)) - mask.float().mean())
+                )
+                lambda_t_plus = min(max(lambda_t_plus, 0), lambda_max)
+
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                model.opt.step()
+
+                preds = model.activate(outs)
 
             step += 1
 
@@ -195,6 +196,9 @@ def train(config, dataroot, split='trainval'):
                 if ood_loss is not None:
                     writer.add_scalar('train/ood_loss', ood_loss, step)
                     writer.add_scalar('train/id_loss', loss-ood_loss, step)
+                
+                writer.add_scalar('train/lambda_t', lambda_t)
+                writer.add_scalar('train/lambda_t_plus', lambda_t_plus)
 
                 if config['ood']:
                     epistemic = model.epistemic(outs)
@@ -220,6 +224,11 @@ def train(config, dataroot, split='trainval'):
                 for i in range(0, n_classes):
                     writer.add_scalar(f'train/{classes[i]}_iou', iou[i], step)
 
+        # Update lambda_t
+        lambda_t = lambda_t_plus
+
+        writer.add_scalar('train/lambda_t', lambda_t, epoch)
+
         aupr = np.mean(total_aupr)
         auroc = np.mean(total_auroc)
         writer.add_scalar('train/aupr', aupr, epoch)
@@ -236,26 +245,18 @@ def train(config, dataroot, split='trainval'):
             total_ious = [[] for _ in range(n_classes)]
 
             for data in val_loader:
-                if map_uncertainty:
-                    images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels = data
-                else:
-                    images, intrinsics, extrinsics, labels, ood = data
-
+                images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels = data
                 t_0 = time()
                 ood_loss = None
 
                 if config['ood']:
-                    if map_uncertainty:
-                        outs = model(images, intrinsics, extrinsics, mapped_uncertainty, mapped_labels)
-                        loss, ood_loss = model.loss_ood(outs, labels.to(model.device), ood, mapped_uncertainty, mapped_labels)
-                        preds = model.activate(outs)
-                    else:
-                        outs = model(images, intrinsics, extrinsics)
-                        loss, ood_loss = model.loss_ood(outs, labels.to(model.device), ood)
-                        preds = model.activate(outs)
+                    outs = model(images, intrinsics, extrinsics, mapped_uncertainty, mapped_labels)
+                    loss, ood_loss = model.loss_ood(outs, labels.to(model.device), ood, mapped_uncertainty, mapped_labels)
+                    preds = model.activate(outs)
                 else:
                     outs = model(images, intrinsics, extrinsics)
                     loss = model.loss(outs, labels.to(model.device))
+                    loss = loss.mean()
                     preds = model.activate(outs)
 
                 total_loss.append(loss.item())
