@@ -157,31 +157,30 @@ def train(config, dataroot, split='trainval'):
                 raise NotImplementedError('Not implemented')
                 # outs, preds, loss, ood_loss, lambda_t = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
             else:
-                with torch.autograd.detect_anomaly():
-                    model.opt.zero_grad(set_to_none=True)
-                    lr = get_lr(model.opt)
-                    outs = model(images, intrinsics, extrinsics)
-                    ce = model.loss(outs, mapped_labels.to(model.device))
+                model.opt.zero_grad(set_to_none=True)
+                lr = get_lr(model.opt)
+                outs = model(images, intrinsics, extrinsics)
+                ce = model.loss(outs, mapped_labels.to(model.device))
 
-                    mask = (ce > lambda_t)
+                mask = (ce > lambda_t)
 
-                    ce[mask] = 0.0
+                ce[~mask] = 0.0
 
-                    loss = ce.mean()
+                loss = ce.mean()
 
-                    num_pixels_N = outs.shape[2]*outs.shape[3]
-                    num_frames_L = outs.shape[0]
-                    lambda_t_plus = max(
-                        0,
-                        lambda_t - lambda_step_length*((top_k / (num_pixels_N*num_frames_L)) - mask.float().mean())
-                    )
-                    lambda_t_plus = min(max(lambda_t_plus, 0), lambda_max)
+                num_pixels_N = outs.shape[2]*outs.shape[3]
+                num_frames_L = outs.shape[0]
+                lambda_t_plus = max(
+                    0,
+                    lambda_t - lambda_step_length*((top_k / (num_pixels_N*num_frames_L)) - mask.float().mean())
+                )
+                lambda_t_plus = min(max(lambda_t_plus, 0), lambda_max)
 
-                    loss.backward()
-                    nn.utils.clip_grad_norm_(model.parameters(), 5.0)
-                    model.opt.step()
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                model.opt.step()
 
-                    preds = model.activate(outs)
+                preds = model.activate(outs)
 
             step += 1
 
