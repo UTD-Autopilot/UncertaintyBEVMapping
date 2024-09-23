@@ -133,8 +133,26 @@ def train(config, dataroot, split='trainval'):
     # enable to catch errors in loss function
     # torch.autograd.set_detect_anomaly(True)
 
+    subsample_count = 10
+
+    with torch.no_grad():
+        ce_losses = []
+        for i, data in enumerate(train_loader):
+            images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels = data
+            outs = model(images, intrinsics, extrinsics)
+            num_frames_L = outs.shape[0]
+            ce = model.loss(outs, mapped_labels.to(model.device))
+            ce_losses.append(ce)
+            if i >= subsample_count:
+                break
+        ce_losses = torch.stack(ce_losses)
+        initial_lambda = torch.topk(ce_losses.flatten(), top_k*subsample_count*num_frames_L, largest=True).values[-1].float()
+        del ce_losses
+
+    print(f'Initial lambda: {initial_lambda}')
+
     lambda_max = 1.0
-    lambda_t = lambda_max
+    lambda_t = min(initial_lambda, lambda_max)
     lambda_t_plus = 0.0
 
     for epoch in range(config['num_epochs']):
@@ -172,7 +190,7 @@ def train(config, dataroot, split='trainval'):
                 num_frames_L = outs.shape[0]
                 lambda_t_plus = max(
                     0,
-                    lambda_t - lambda_step_length*((top_k / (num_pixels_N*num_frames_L)) - mask.float().mean())
+                    lambda_t - lambda_step_length*(((top_k*num_frames_L) / (num_pixels_N*num_frames_L)) - mask.float().mean())
                 )
                 lambda_t_plus = min(max(lambda_t_plus, 0), lambda_max)
 
