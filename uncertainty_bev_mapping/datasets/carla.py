@@ -203,7 +203,9 @@ class CarlaDataset(torch.utils.data.Dataset):
             mapped_epistemic = None
             mapped_label = None
 
-        return label, ood[None], mapped_epistemic, mapped_label
+        # return label, ood[None], mapped_epistemic, mapped_label
+        # TODO: !!! DEBUG !!! Use true labels as mapped for debugging topk loss
+        return label, ood[None], ood[None], label
 
     def __len__(self):
         return len(self.data)
