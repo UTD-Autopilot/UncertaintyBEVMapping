@@ -156,7 +156,8 @@ def train(config, dataroot, split='trainval'):
                 # top_k_idx is an index for (b h w)
                 top_k_outs = torch.stack([outs[:, i][mask][top_k_idx] for i in range(channels)], dim=-1)
 
-                top_k_loss = top_k_criterion(top_k_outs, torch.ones(top_k_outs.shape[0], dtype=torch.long, device=top_k_outs.device)).mean()
+                # label 0 is vehicle
+                top_k_loss = top_k_criterion(top_k_outs, torch.full((top_k_outs.shape[0]), 0, dtype=torch.long, device=top_k_outs.device)).mean()
 
                 loss = ce_loss + top_k_loss
 
@@ -176,8 +177,8 @@ def train(config, dataroot, split='trainval'):
 
                 writer.add_scalar('train/step_time', time() - t_0, step)
                 writer.add_scalar('train/loss', loss, step)
-                writer.add_scalar('train/top_k_loss', top_k_loss.mean(), step)
-                writer.add_scalar('train/ce_loss', ce_loss.mean(), step)
+                writer.add_scalar('train/top_k_loss', top_k_loss, step)
+                writer.add_scalar('train/ce_loss', ce_loss, step)
 
                 if ood_loss is not None:
                     writer.add_scalar('train/ood_loss', ood_loss, step)
@@ -237,18 +238,21 @@ def train(config, dataroot, split='trainval'):
                     outs = model(images, intrinsics, extrinsics)
                     preds = model.activate(outs)
 
-                    mask = (mapped_labels == 1)
+                    ce = model.loss(outs, mapped_labels.to(model.device))
+                    mask = (mapped_labels[:, 0] == 1)
+                    ce_loss = ce[~mask].mean()
 
-                    ce_loss = ce[~mask]
                     mapped_region_ce = ce[mask]
-                    k = torch.min(mapped_region_ce.shape, top_k * batch_size)
+                    k = min(mapped_region_ce.shape[0], top_k * batch_size)
                     top_k_ce, top_k_idx = torch.topk(mapped_region_ce, k, largest=True)
-                    top_k_loss = top_k_criterion(top_k_ce, torch.ones_like(top_k_ce, dtype=torch.long))
+                    top_k_outs = torch.stack([outs[:, i][mask][top_k_idx] for i in range(channels)], dim=-1)
 
-                    loss = ce_loss.mean() + top_k_loss.mean()
+                    top_k_loss = top_k_criterion(top_k_outs, torch.full((top_k_outs.shape[0]), 0, dtype=torch.long, device=top_k_outs.device)).mean()
+
+                    loss = ce_loss + top_k_loss
 
                 total_loss.append(loss.item())
-                total_top_k_loss.append(top_k_loss.mean().item())
+                total_top_k_loss.append(top_k_loss.item())
 
                 if ood_loss is not None:
                     total_ood_loss.append(ood_loss.item())
