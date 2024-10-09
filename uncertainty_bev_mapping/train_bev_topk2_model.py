@@ -247,7 +247,7 @@ def train(config, dataroot, split='trainval'):
                     top_k_ce, top_k_idx = torch.topk(mapped_region_ce, k, largest=True)
                     top_k_outs = torch.stack([outs[:, i][mask][top_k_idx] for i in range(channels)], dim=-1)
 
-                    top_k_loss = top_k_criterion(top_k_outs, torch.full((top_k_outs.shape[0]), 0, dtype=torch.long, device=top_k_outs.device)).mean()
+                    top_k_loss = top_k_criterion(top_k_outs, torch.full((top_k_outs.shape[0],), 0, dtype=torch.long, device=top_k_outs.device)).mean()
 
                     loss = ce_loss + top_k_loss
 
