@@ -43,11 +43,12 @@ def nn_resample(img, shape):
                per_axis(img.shape[1], shape[1])]
 
 class CarlaDataset(torch.utils.data.Dataset):
-    def __init__(self, data_path, is_train, pos_class, map_uncertainty=False):
+    def __init__(self, data_path, is_train, pos_class, map_uncertainty=False, map_label_expand_size=0):
         self.is_train = is_train
         self.return_info = False
         self.pos_class = pos_class
         self.map_uncertainty = map_uncertainty
+        self.map_label_expand_size = map_label_expand_size
 
         self.data_path = data_path
 
@@ -204,7 +205,34 @@ class CarlaDataset(torch.utils.data.Dataset):
 
         # return label, ood[None], mapped_epistemic, mapped_label
         # TODO: !!! DEBUG !!! Use true labels as mapped for debugging topk loss
-        return label, ood[None], ood[None], label
+        mapped_label = label.copy()
+        mapped_epistemic = ood[None].copy()
+
+        if self.map_label_expand_size > 0:
+            mapped_label[0] = self.expand_labels(mapped_label[0], self.map_label_expand_size)
+        return label, ood[None], mapped_epistemic, mapped_label
+
+    def expand_labels(self, img, expand_size):
+        img = img.copy()
+        img_h, img_w = img.shape
+        expand_size_l = expand_size_r = expand_size_u = expand_size_d = (expand_size // 4)
+        if expand_size % 4 >= 1:
+            expand_size_l += 1
+        if expand_size % 4 >= 2:
+            expand_size_r += 1
+        if expand_size % 4 >= 3:
+            expand_size_u += 1
+
+        if expand_size_l > 0:
+            img += np.concatenate([np.zeros((expand_size_l, img_w), dtype=bool), img[:-expand_size_l]], axis=0)
+        if expand_size_r > 0:
+            img += np.concatenate([img[expand_size_r:], np.zeros((expand_size_r, img_w), dtype=bool)], axis=0)
+        if expand_size_u > 0:
+            img += np.concatenate([np.zeros((img_h, expand_size_u), dtype=bool), img[:,:-expand_size_u]], axis=1)
+        if expand_size_d > 0:
+            img += np.concatenate([img[:, expand_size_d:], np.zeros((img_h, expand_size_d), dtype=bool)], axis=1)
+
+        return img.astype(bool)
 
     def __len__(self):
         return len(self.data)
@@ -228,8 +256,8 @@ class CarlaDataset(torch.utils.data.Dataset):
             return images, intrinsics, extrinsics, labels, ood
 
 
-def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, is_train=False, seed=0, yaw=-1, map_uncertainty=False):
-    data = CarlaDataset(os.path.join(dataroot, set), is_train, pos_class, map_uncertainty=map_uncertainty)
+def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, is_train=False, seed=0, yaw=-1, **kwargs):
+    data = CarlaDataset(os.path.join(dataroot, set), is_train, pos_class, **kwargs)
     random.seed(seed)
     torch.cuda.manual_seed(seed)
     torch.manual_seed(seed)
