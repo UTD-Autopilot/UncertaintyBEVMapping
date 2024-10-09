@@ -61,7 +61,7 @@ class CarlaDataset(torch.utils.data.Dataset):
                 agent_folders.append(dirpath)
 
         for agent_path in agent_folders:
-            if map_uncertainty and not os.path.exists(os.path.join(agent_path, 'bev_mapping')):
+            if map_uncertainty and not os.path.exists(os.path.join(agent_path, 'bev_mapping_epistemic')):
                 continue
             splitted_path = split_path_into_folders(agent_path)
             agent_id = splitted_path[-1]
@@ -102,7 +102,6 @@ class CarlaDataset(torch.utils.data.Dataset):
 
                 # intrinsic = torch.tensor(sensor_info["intrinsic"])
                 sensor_options = sensor_info['sensor_options'] # width and height are in sensor_options['image_size_x'] and sensor_options['image_size_y']
-                
                 intrinsic = get_intrinsics(480, 224, sensor_options["fov"]).astype(np.float32)
                 translation = np.array(sensor_info["transform"]["location"])
                 rotation = sensor_info["transform"]["rotation"]
@@ -129,34 +128,20 @@ class CarlaDataset(torch.utils.data.Dataset):
                                           torch.stack(extrinsics, dim=0))
 
         return images, intrinsics, extrinsics
-
-    def get_label(self, index, agent_path):
-        # label_r = Image.open(os.path.join(agent_path, "bev_semantic", f'{index}.png'))
-        label_r = Image.open(os.path.join(agent_path, "birds_view_semantic_camera", f'{index}.png'))
-        if label_r.size != (200, 200):
-            label_r =  label_r.resize((200, 200), Image.Resampling.NEAREST)
-        label = np.array(label_r)
-        label_r.close()
-
-        if self.map_uncertainty:
-            mapped_epistemic = np.load(os.path.join(agent_path, "bev_mapping_epistemic", f'{index}.npy'))
-            if mapped_epistemic.shape != (200, 200):
-                mapped_epistemic =  nn_resample(mapped_epistemic, (200, 200))
-        else:
-            mapped_epistemic = None
-
+    
+    def semantic_rgb_to_label(self, semantic):
         empty = np.ones(self.bev_dimension[:2])
 
-        road = mask(label, (128, 64, 128))
-        lane = mask(label, (157, 234, 50))
-        vehicles = mask(label, (0, 0, 142))
+        road = mask(semantic, (128, 64, 128))
+        lane = mask(semantic, (157, 234, 50))
+        vehicles = mask(semantic, (0, 0, 142))
 
-        if np.sum(vehicles) < 5:
-            lane = mask(label, (50, 234, 157))
-            vehicles = mask(label, (142, 0, 0))
+        # if np.sum(vehicles) < 5:
+        #     lane = mask(semantic, (50, 234, 157))
+        #     vehicles = mask(semantic, (142, 0, 0))
 
-        # ood = mask(label, (0, 0, 0))
-        ood = mask(label, (50, 100, 144))
+        # ood = mask(semantic, (0, 0, 0))
+        ood = mask(semantic, (50, 100, 144))
         bounding_boxes = find_bounding_boxes(ood)
         ood = draw_bounding_boxes(bounding_boxes)
 
@@ -189,7 +174,37 @@ class CarlaDataset(torch.utils.data.Dataset):
             empty[road == 1] = 0
             label = np.stack((vehicles, road, lane, empty))
 
-        return label, ood[None], mapped_epistemic
+        return label, ood
+
+    def get_label(self, index, agent_path):
+        # label_r = Image.open(os.path.join(agent_path, "bev_semantic", f'{index}.png'))
+        label_r = Image.open(os.path.join(agent_path, "birds_view_semantic_camera", f'{index}.png'))
+        if label_r.size != (200, 200):
+            label_r =  label_r.resize((200, 200), Image.Resampling.NEAREST)
+
+        label = np.array(label_r)
+        label_r.close()
+
+        label, ood = self.semantic_rgb_to_label(label)
+
+        if self.map_uncertainty:
+            mapped_epistemic = np.load(os.path.join(agent_path, "bev_mapping_epistemic", f'{index}.npy'))
+            if mapped_epistemic.shape != (200, 200):
+                mapped_epistemic =  nn_resample(mapped_epistemic, (200, 200))
+                
+            mapped_label_r = Image.open(os.path.join(agent_path, "bev_mapping_pred", f'{index}.png'))
+            if mapped_label_r.size != (200, 200):
+                mapped_label_r = mapped_label_r.resize((200, 200), Image.Resampling.NEAREST)
+            mapped_label = np.array(mapped_label_r)
+            mapped_label_r.close()
+            mapped_label, _ = self.semantic_rgb_to_label(mapped_label)
+        else:
+            mapped_epistemic = None
+            mapped_label = None
+
+        # return label, ood[None], mapped_epistemic, mapped_label
+        # TODO: !!! DEBUG !!! Use true labels as mapped for debugging topk loss
+        return label, ood[None], ood[None], label
 
     def __len__(self):
         return len(self.data)
@@ -198,7 +213,7 @@ class CarlaDataset(torch.utils.data.Dataset):
         agent_path, agent_id, index = self.data[idx]
 
         images, intrinsics, extrinsics = self.get_input_data(index, agent_path)
-        labels, ood, mapped_epistemic = self.get_label(index, agent_path)
+        labels, ood, mapped_epistemic, mapped_label = self.get_label(index, agent_path)
 
         if self.return_info:
             return images, intrinsics, extrinsics, labels, ood, {
@@ -208,13 +223,13 @@ class CarlaDataset(torch.utils.data.Dataset):
             }
 
         if self.map_uncertainty:
-            return images, intrinsics, extrinsics, labels, ood, mapped_epistemic
+            return images, intrinsics, extrinsics, labels, ood, mapped_epistemic, mapped_label
         else:
             return images, intrinsics, extrinsics, labels, ood
 
 
-def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, is_train=False, seed=0, yaw=-1, **kwargs):
-    data = CarlaDataset(os.path.join(dataroot, set), is_train, pos_class, **kwargs)
+def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, is_train=False, seed=0, yaw=-1, map_uncertainty=False):
+    data = CarlaDataset(os.path.join(dataroot, set), is_train, pos_class, map_uncertainty=map_uncertainty)
     random.seed(seed)
     torch.cuda.manual_seed(seed)
     torch.manual_seed(seed)

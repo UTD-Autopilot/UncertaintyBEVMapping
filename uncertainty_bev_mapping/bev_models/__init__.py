@@ -1,9 +1,9 @@
 from .baseline import Baseline
 from .evidential import Evidential
-from .evidenital_topk import EvidentialTopK
+from .baseline_topk import BaselineTopK
 
 models = {
     'baseline': Baseline,
     'evidential': Evidential,
-    'evidential_topk': EvidentialTopK,
+    'baseline_topk': BaselineTopK,
 }

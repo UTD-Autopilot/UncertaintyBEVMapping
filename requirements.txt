@@ -26,3 +26,7 @@ kaleido
 efficientnet_pytorch
 pyquaternion
 nuscenes-devkit
+pynvml
+tensorboardx
+einops
+torchmetrics

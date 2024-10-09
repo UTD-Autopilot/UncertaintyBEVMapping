@@ -4,7 +4,7 @@ import argparse
 import pynvml
 import time
 
-from uncertainty_bev_mapping.train_bev_model import train
+from uncertainty_bev_mapping.train_bev_topk_model import train
 from uncertainty_bev_mapping.utils import get_config, get_available_gpus
 
 

@@ -29,8 +29,8 @@ class NuScenesDataset(torch.utils.data.Dataset):
 
         self.dataroot = nusc.dataroot
 
-        self.pseudo_ood = ["vehicle.bicycle", "static_object.bicycle_rack"]
-        self.true_ood = ["vehicle.motorcycle"]
+        self.pseudo_ood = ['vehicle.bicycle', 'static_object.bicycle_rack']
+        self.true_ood = ['vehicle.motorcycle']
 
         self.all_ood = self.true_ood + self.pseudo_ood
 
@@ -100,9 +100,6 @@ class NuScenesDataset(torch.utils.data.Dataset):
                 if max(abs(ego_coord[0] - box_coord[0]), abs(ego_coord[1] - box_coord[1])) > 50:
                     continue
 
-                if int(inst['visibility_token']) <= 2:
-                    continue
-
                 if inst['category_name'] in self.true_ood:
                     is_true_ood = True
 
@@ -113,7 +110,7 @@ class NuScenesDataset(torch.utils.data.Dataset):
                 records.append(rec)
             if self.ood and is_true_ood:
                 records.append(rec)
-            if self.pseudo and is_pseudo_ood:
+            if self.pseudo and is_pseudo_ood and not is_true_ood:
                 records.append(rec)
 
         return records
@@ -205,9 +202,6 @@ class NuScenesDataset(torch.utils.data.Dataset):
 
         for token in rec['anns']:
             inst = self.nusc.get('sample_annotation', token)
-
-            if int(inst['visibility_token']) == 1:
-                continue
 
             if 'vehicle' in inst['category_name']:
                 pts, _ = self.get_region(inst, trans, rot)

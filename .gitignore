@@ -1,5 +1,6 @@
 /datasets
 /outputs
+/outputs*
 
 /tmp
 
@@ -28,3 +29,11 @@ cython_debug/
 
 # Egg file
 *.egg-info/
+
+# vscode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets

@@ -81,10 +81,7 @@ def u_focal_loss(alpha, y, weights=None, n=2):
 
 
 def entropy_reg(alpha, beta_reg=.001):
-    if len(alpha.shape) == 4:
-        alpha = alpha.permute(0, 2, 3, 1)
-    elif len(alpha.shape) == 3:
-        alpha = alpha.permute(0, 2, 1)
+    alpha = alpha.permute(0, 2, 3, 1)
 
     reg = D.Dirichlet(alpha).entropy().unsqueeze(1)
 
@@ -93,12 +90,9 @@ def entropy_reg(alpha, beta_reg=.001):
 
 def ood_reg(alpha, ood):
     if ood.long().sum() == 0:
-        return 0
+        return torch.tensor(0, dtype=alpha.dtype, device=alpha.device)
 
-    if len(alpha.shape) == 4:
-        alpha = alpha.permute(0, 2, 3, 1)
-    elif len(alpha.shape) == 3:
-        alpha = alpha.permute(0, 2, 1)
+    alpha = alpha.permute(0, 2, 3, 1)
 
     alpha_d = D.Dirichlet(alpha)
     target_d = D.Dirichlet(torch.ones_like(alpha))
@@ -107,6 +101,9 @@ def ood_reg(alpha, ood):
 
     return reg[ood.bool()].mean()
 
+
+def gamma(x):
+    return torch.exp(torch.lgamma(x))
 
 def ood_reg_topk(alpha, mapped_uncertainty, thres=0.5):
     ood = (mapped_uncertainty > thres)
@@ -124,7 +121,3 @@ def ood_reg_topk(alpha, mapped_uncertainty, thres=0.5):
 
     # directly return mean since in topk mode we already did the filtering
     return reg[ood.bool()].mean()
-
-
-def gamma(x):
-    return torch.exp(torch.lgamma(x))
