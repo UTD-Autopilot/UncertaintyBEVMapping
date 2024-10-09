@@ -98,7 +98,7 @@ def train(config, dataroot, split='trainval'):
     top_k = config['top_k']
     top_k_criterion = nn.CrossEntropyLoss()
 
-    print("--------------------------------------------q------")
+    print("--------------------------------------------------")
     print(f"Using GPUS: {config['gpus']}")
     print(f"Train loader: {len(train_loader.dataset)}")
     print(f"Val loader: {len(val_loader.dataset)}")
