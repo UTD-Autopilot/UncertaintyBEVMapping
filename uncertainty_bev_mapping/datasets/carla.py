@@ -187,6 +187,7 @@ class CarlaDataset(torch.utils.data.Dataset):
         label_r.close()
 
         label, ood = self.semantic_rgb_to_label(label)
+        ood = ood[None]
 
         if self.map_uncertainty:
             mapped_epistemic = np.load(os.path.join(agent_path, "bev_mapping_epistemic", f'{index}.npy'))
@@ -203,14 +204,15 @@ class CarlaDataset(torch.utils.data.Dataset):
             mapped_epistemic = None
             mapped_label = None
 
-        # return label, ood[None], mapped_epistemic, mapped_label
+        # return label, ood, mapped_epistemic, mapped_label
         # TODO: !!! DEBUG !!! Use true labels as mapped for debugging topk loss
         mapped_label = label.copy()
-        mapped_epistemic = ood[None].copy()
+        mapped_epistemic = ood.copy()    # ood is (1, 200, 200)
 
         if self.map_label_expand_size > 0:
             mapped_label[0] = self.expand_labels(mapped_label[0], self.map_label_expand_size)
-        return label, ood[None], mapped_epistemic, mapped_label
+            mapped_epistemic[0] = self.expand_labels(mapped_epistemic[0], self.map_label_expand_size)
+        return label, ood, mapped_epistemic, mapped_label
 
     def expand_labels(self, img, expand_size):
         img = img.copy()

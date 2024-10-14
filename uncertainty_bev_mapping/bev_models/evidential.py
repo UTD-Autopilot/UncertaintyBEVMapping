@@ -70,15 +70,10 @@ class Evidential(Model):
         return outs, preds, loss, oodl
 
     def forward(self, images, intrinsics, extrinsics, limit=None):
-        if self.tsne:
-            print("Returning intermediate")
-            return self.backbone(images, intrinsics, extrinsics)
-
         evidence = self.backbone(images, intrinsics, extrinsics).relu()
 
         if limit is not None:
             evidence = evidence.clamp(max=limit)
-        alpha = evidence + 1
+        alpha = evidence + 1.0
 
         return alpha
-

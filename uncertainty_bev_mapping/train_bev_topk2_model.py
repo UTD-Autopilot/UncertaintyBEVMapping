@@ -115,6 +115,7 @@ def train(config, dataroot, split='trainval'):
 
     # enable to catch errors in loss function
     # torch.autograd.set_detect_anomaly(True)
+    device = model.device
 
     for epoch in range(config['num_epochs']):
         model.train()
@@ -128,6 +129,8 @@ def train(config, dataroot, split='trainval'):
 
         for data in train_loader:
             images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels = data
+            labels = labels.to(device)
+            mapped_uncertainty = mapped_uncertainty.to(device)
             batch_size = labels.shape[0]
             channels = labels.shape[1]
 
@@ -135,7 +138,9 @@ def train(config, dataroot, split='trainval'):
             ood_loss = None
 
             if config['ood']:
-                outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
+                mapped_uncertainty = mapped_uncertainty.squeeze(1) # remove channel dim
+                outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels, top_k=top_k)
+                top_k_loss = ood_loss
             else:
                 # only works for class 0 (vehicle)
                 model.opt.zero_grad(set_to_none=True)
@@ -177,7 +182,7 @@ def train(config, dataroot, split='trainval'):
                 writer.add_scalar('train/step_time', time() - t_0, step)
                 writer.add_scalar('train/loss', loss, step)
                 writer.add_scalar('train/top_k_loss', top_k_loss, step)
-                writer.add_scalar('train/ce_loss', ce_loss, step)
+                # writer.add_scalar('train/ce_loss', ce_loss, step)
 
                 if ood_loss is not None:
                     writer.add_scalar('train/ood_loss', ood_loss, step)
@@ -200,7 +205,7 @@ def train(config, dataroot, split='trainval'):
 
                 save_pred(preds, labels, config['logdir'])
 
-                iou = get_iou(preds.cpu(), labels)
+                iou = get_iou(preds, labels)
 
                 print(f'[{epoch}] {step} IOU: {iou}')
 
@@ -226,12 +231,16 @@ def train(config, dataroot, split='trainval'):
 
             for data in val_loader:
                 images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels = data
+                labels = labels.to(device)
+                mapped_uncertainty = mapped_uncertainty.to(device)
                 t_0 = time()
                 ood_loss = None
 
                 if config['ood']:
-                    outs = model(images, intrinsics, extrinsics, mapped_uncertainty, mapped_labels)
-                    loss, ood_loss = model.loss_ood(outs, labels.to(model.device), ood, mapped_uncertainty, mapped_labels)
+                    mapped_uncertainty = mapped_uncertainty.squeeze(1)
+                    outs = model(images, intrinsics, extrinsics)
+                    loss, ood_loss = model.loss_ood(outs, labels, ood, mapped_uncertainty, mapped_labels, top_k=top_k)
+                    top_k_loss = ood_loss
                     preds = model.activate(outs)
                 else:
                     outs = model(images, intrinsics, extrinsics)
@@ -270,7 +279,7 @@ def train(config, dataroot, split='trainval'):
 
                 save_pred(preds, labels, config['logdir'])
 
-                iou = get_iou(preds.cpu(), labels)
+                iou = get_iou(preds, labels)
 
                 print(f'[{epoch}] {step} IOU: {iou}')
 
