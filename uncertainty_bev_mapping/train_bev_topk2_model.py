@@ -135,8 +135,7 @@ def train(config, dataroot, split='trainval'):
             ood_loss = None
 
             if config['ood']:
-                raise NotImplementedError('Not implemented')
-                # outs, preds, loss, ood_loss, lambda_t = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
+                outs, preds, loss, ood_loss = model.train_step_ood(images, intrinsics, extrinsics, labels, ood, mapped_uncertainty, mapped_labels)
             else:
                 # only works for class 0 (vehicle)
                 model.opt.zero_grad(set_to_none=True)
