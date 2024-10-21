@@ -300,15 +300,15 @@ def get_nusc(version, dataroot):
     return nusc, dataroot
 
 
-def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, seed=0, yaw=180, is_train=False, map_uncertainty=False):
+def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16, seed=0, yaw=180, is_train=False, map_uncertainty=False, map_label_expand_size=0):
     if set == "train":
         ind, ood, pseudo, is_train = True, False, False, True
     elif set == "val":
         ind, ood, pseudo, is_train = True, False, False, False
-    elif set == "train_aug":
-        ind, ood, pseudo, is_train = False, False, True, True
-    elif set == "val_aug":
-        ind, ood, pseudo, is_train = False, False, True, False
+    # elif set == "train_aug":
+    #     ind, ood, pseudo, is_train = False, False, True, True
+    # elif set == "val_aug":
+    #     ind, ood, pseudo, is_train = False, False, True, False
     elif set == "train_comb":
         ind, ood, pseudo, is_train = True, False, True, True
     elif set == "val_comb":
@@ -328,7 +328,7 @@ def compile_data(set, version, dataroot, pos_class, batch_size=8, num_workers=16
 
     nusc, dataroot = get_nusc("trainval", dataroot)
 
-    data = NuScenesDataset(nusc, is_train, pos_class, ind=ind, ood=ood, pseudo=pseudo, yaw=yaw, map_uncertainty=False)
+    data = NuScenesDataset(nusc, is_train, pos_class, ind=ind, ood=ood, pseudo=pseudo, yaw=yaw, map_uncertainty=map_uncertainty, map_label_expand_size=map_label_expand_size)
     random.seed(seed)
     torch.cuda.manual_seed(seed)
     torch.manual_seed(seed)
