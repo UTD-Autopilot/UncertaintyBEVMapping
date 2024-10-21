@@ -225,3 +225,26 @@ def draw_bounding_boxes(bounding_boxes, dim=(200, 200)):
         cv2.fillPoly(mask, [bounding_box], 1.0)
 
     return mask
+
+
+def expand_labels(img, expand_size):
+    img = img.copy()
+    img_h, img_w = img.shape
+    expand_size_l = expand_size_r = expand_size_u = expand_size_d = (expand_size // 4)
+    if expand_size % 4 >= 1:
+        expand_size_l += 1
+    if expand_size % 4 >= 2:
+        expand_size_r += 1
+    if expand_size % 4 >= 3:
+        expand_size_u += 1
+
+    if expand_size_l > 0:
+        img += np.concatenate([np.zeros((expand_size_l, img_w), dtype=bool), img[:-expand_size_l]], axis=0)
+    if expand_size_r > 0:
+        img += np.concatenate([img[expand_size_r:], np.zeros((expand_size_r, img_w), dtype=bool)], axis=0)
+    if expand_size_u > 0:
+        img += np.concatenate([np.zeros((img_h, expand_size_u), dtype=bool), img[:,:-expand_size_u]], axis=1)
+    if expand_size_d > 0:
+        img += np.concatenate([img[:, expand_size_d:], np.zeros((img_h, expand_size_d), dtype=bool)], axis=1)
+
+    return img.astype(bool)

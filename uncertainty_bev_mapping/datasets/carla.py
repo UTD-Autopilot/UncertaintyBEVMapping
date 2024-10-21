@@ -11,6 +11,7 @@ from torch.utils.data import Subset
 from torchvision.transforms.functional import center_crop
 
 from .geometry_utils import calculate_birds_eye_view_parameters, Rotation, mask, find_bounding_boxes, draw_bounding_boxes
+from .geometry_utils import expand_labels
 
 def split_path_into_folders(path):
     folders = []
@@ -210,31 +211,9 @@ class CarlaDataset(torch.utils.data.Dataset):
         mapped_epistemic = ood.copy()    # ood is (1, 200, 200)
 
         if self.map_label_expand_size > 0:
-            mapped_label[0] = self.expand_labels(mapped_label[0], self.map_label_expand_size)
-            mapped_epistemic[0] = self.expand_labels(mapped_epistemic[0], self.map_label_expand_size)
+            mapped_label[0] = expand_labels(mapped_label[0], self.map_label_expand_size)
+            mapped_epistemic[0] = expand_labels(mapped_epistemic[0], self.map_label_expand_size)
         return label, ood, mapped_epistemic, mapped_label
-
-    def expand_labels(self, img, expand_size):
-        img = img.copy()
-        img_h, img_w = img.shape
-        expand_size_l = expand_size_r = expand_size_u = expand_size_d = (expand_size // 4)
-        if expand_size % 4 >= 1:
-            expand_size_l += 1
-        if expand_size % 4 >= 2:
-            expand_size_r += 1
-        if expand_size % 4 >= 3:
-            expand_size_u += 1
-
-        if expand_size_l > 0:
-            img += np.concatenate([np.zeros((expand_size_l, img_w), dtype=bool), img[:-expand_size_l]], axis=0)
-        if expand_size_r > 0:
-            img += np.concatenate([img[expand_size_r:], np.zeros((expand_size_r, img_w), dtype=bool)], axis=0)
-        if expand_size_u > 0:
-            img += np.concatenate([np.zeros((img_h, expand_size_u), dtype=bool), img[:,:-expand_size_u]], axis=1)
-        if expand_size_d > 0:
-            img += np.concatenate([img[:, expand_size_d:], np.zeros((img_h, expand_size_d), dtype=bool)], axis=1)
-
-        return img.astype(bool)
 
     def __len__(self):
         return len(self.data)

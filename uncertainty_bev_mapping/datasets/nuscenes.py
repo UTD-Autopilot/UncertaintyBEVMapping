@@ -13,19 +13,21 @@ from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.splits import create_splits_scenes
 
 from .geometry_utils import Rotation, Box, Quaternion, calculate_birds_eye_view_parameters, resize_and_crop_image, update_intrinsics
+from .geometry_utils import expand_labels
 
 from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 class NuScenesDataset(torch.utils.data.Dataset):
-    def __init__(self, nusc, is_train, pos_class, ind=False, ood=False, pseudo=False, yaw=180, map_uncertainty=False):
+    def __init__(self, nusc, is_train, pos_class, ind=False, ood=False, pseudo=False, yaw=180, map_uncertainty=False, map_label_expand_size=0):
         self.ind = ind
         self.ood = ood
         self.pseudo = pseudo
         self.pos_class = pos_class
         self.yaw = yaw
-        # TODO: map uncertainty support
+        self.map_uncertainty = map_uncertainty
+        self.map_label_expand_size = map_label_expand_size
 
         self.dataroot = nusc.dataroot
 
@@ -233,8 +235,16 @@ class NuScenesDataset(torch.utils.data.Dataset):
             road[lane] = 0
             lane[vehicles] = 0
             label = np.stack((vehicles, road, lane, empty))
+        ood = ood[None]
 
-        return torch.tensor(label.copy()), torch.tensor(ood[None])
+        mapped_label = label.copy()
+        mapped_epistemic = ood.copy()    # ood is (1, 200, 200)
+
+        if self.map_label_expand_size > 0:
+            mapped_label[0] = expand_labels(mapped_label[0], self.map_label_expand_size)
+            mapped_epistemic[0] = expand_labels(mapped_epistemic[0], self.map_label_expand_size)
+        return label, ood, mapped_epistemic, mapped_label
+        # return torch.tensor(label.copy()), torch.tensor(ood[None])
 
     def get_region(self, instance_annotation, ego_translation, ego_rotation):
         box = Box(instance_annotation['translation'], instance_annotation['size'],
@@ -274,9 +284,13 @@ class NuScenesDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         rec = self.ixes[index]
         images, intrinsics, extrinsics = self.get_input_data(rec)
-        labels, oods = self.get_label(rec)
+        labels, oods, mapped_epistemic, mapped_label = self.get_label(rec)
 
-        return images, intrinsics, extrinsics, labels, oods
+        
+        if self.map_uncertainty:
+            return images, intrinsics, extrinsics, labels, oods, mapped_epistemic, mapped_label
+        else:
+            return images, intrinsics, extrinsics, labels, oods
 
 
 def get_nusc(version, dataroot):
