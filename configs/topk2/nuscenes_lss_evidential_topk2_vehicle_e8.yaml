@@ -4,7 +4,7 @@ backbone: lss
 dataset: nuscenes
 train_set: train_comb
 val_set: val_comb
-logdir: outputs/nuscenes/lss_evidential_topk2_vehicle_e2
+logdir: outputs/nuscenes/lss_evidential_topk2_vehicle_e8
 batch_size: 32
 learning_rate: 0.01
 weight_decay: 0.0000001
@@ -17,3 +17,4 @@ classes: ['vehicle', 'background']
 weights: [2.0, 1.0]
 top_k: 50
 map_label_expand_size: 8
+pretrained: outputs/nuscenes/lss_evidential_topk2_vehicle_1/15.pt

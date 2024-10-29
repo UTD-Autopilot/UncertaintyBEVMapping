@@ -17,3 +17,4 @@ classes: ['vehicle', 'background']
 weights: [2.0, 1.0]
 top_k: 50
 map_label_expand_size: 2
+pretrained: outputs/nuscenes/lss_evidential_topk2_vehicle_1/15.pt
