@@ -30,3 +30,7 @@ pynvml
 tensorboardx
 einops
 torchmetrics
+
+# waymo dataset
+gcsfs
+waymo-open-dataset-tf-2-12-0==1.6.4
