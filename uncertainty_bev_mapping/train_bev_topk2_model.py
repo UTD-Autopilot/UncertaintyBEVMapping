@@ -39,10 +39,12 @@ def train(config, dataroot, split='trainval'):
     train_set = config['train_set']
     val_set = config['val_set']
 
-    if config['backbone'] == 'lss':
+    if config['backbone'] == 'lss' or config['backbone'] == 'simplebev':
         yaw = 0
     elif config['backbone'] == 'cvt':
         yaw = 180
+    else:
+        raise NotImplementedError(f"yaw correction for backbone model {config['backbone']} not defined")
 
     train_loader = datasets[config['dataset']](
         train_set, split, dataroot, config['pos_class'],

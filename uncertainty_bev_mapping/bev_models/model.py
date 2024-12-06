@@ -3,10 +3,12 @@ import torch.nn as nn
 
 from .backbones.cvt.cross_view_transformer import CrossViewTransformer
 from .backbones.lss.lift_splat_shoot import LiftSplatShoot
+from .backbones.simplebev.simplebev import SimpleBEV
 
 backbones = {
     'cvt': CrossViewTransformer,
     'lss': LiftSplatShoot,
+    'simplebev': SimpleBEV,
 }
 
 
