@@ -1,0 +1,19 @@
+type: ensemble
+map_uncertainty: true
+backbone: pointbev
+dataset: carla
+train_set: train
+val_set: val
+logdir: outputs/carla/pointbev_ensemble_vehicle
+batch_size: 8
+learning_rate: 0.01
+weight_decay: 0.0000001
+num_epochs: 40
+loss: ce
+ood: true
+pos_class: 'vehicle'
+n_classes: 2
+classes: ['vehicle', 'background']
+weights: [2.0, 1.0]
+top_k: 50
+map_label_expand_size: 0

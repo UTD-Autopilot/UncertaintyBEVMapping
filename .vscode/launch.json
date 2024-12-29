@@ -22,25 +22,27 @@
             ]
         },
         {
-            "name": "train_bev_model.py configs/nuscenes_lss_evidential_vehicle.yaml",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "scripts/train_bev_model.py",
-            "console": "integratedTerminal",
-            "args": [
-                "configs/nuscenes_lss_evidential_vehicle.yaml",
-                "-g",
-                "0"
-            ]
-        },
-        {
-            "name": "train_bev_topk2_model.py configs/carla_lss_evidential_topk2_vehicle.yaml",
+            "name": "train_bev_topk2_model.py configs/topk2/nuscenes_pointbev_evidential_topk2_vehicle.yaml",
             "type": "debugpy",
             "request": "launch",
             "program": "scripts/train_bev_topk2_model.py",
+            "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "args": [
-                "configs/carla_lss_evidential_topk2_vehicle.yaml",
+                "configs/topk2/nuscenes_pointbev_evidential_topk2_vehicle.yaml",
+                "-g",
+                "0", "1"
+            ]
+        },
+        {
+            "name": "train_bev_topk2_model.py configs/topk2/nuscenes_pointbev_baseline_vehicle.yaml",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/train_bev_topk2_model.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": [
+                "configs/topk2/nuscenes_pointbev_baseline_vehicle.yaml",
                 "-g",
                 "0", "1"
             ]

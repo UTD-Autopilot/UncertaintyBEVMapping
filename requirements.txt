@@ -34,3 +34,8 @@ torchmetrics
 # waymo dataset
 gcsfs
 waymo-open-dataset-tf-2-12-0==1.6.4
+
+# pointbev
+spconv-cu126
+pytorch_lightning
+hydra-core

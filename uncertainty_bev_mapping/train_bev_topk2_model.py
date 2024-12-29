@@ -39,7 +39,7 @@ def train(config, dataroot, split='trainval'):
     train_set = config['train_set']
     val_set = config['val_set']
 
-    if config['backbone'] == 'lss' or config['backbone'] == 'simplebev':
+    if config['backbone'] == 'lss' or config['backbone'] == 'simplebev' or config['backbone'] == 'pointbev':
         yaw = 0
     elif config['backbone'] == 'cvt':
         yaw = 180
@@ -148,7 +148,7 @@ def train(config, dataroot, split='trainval'):
                 model.opt.zero_grad(set_to_none=True)
                 lr = get_lr(model.opt)
                 outs = model(images, intrinsics, extrinsics)
-                ce = model.loss(outs, mapped_labels.to(model.device))
+                ce = model.loss(outs, mapped_labels.to(model.device), reduction='none')
 
                 # Mapped labels will be extended to be larger than true labels in dataloader
                 mask = (mapped_labels[:, 0] == 1)

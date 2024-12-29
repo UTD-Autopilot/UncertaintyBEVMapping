@@ -15,4 +15,4 @@ n_classes: 2
 classes: ['vehicle', 'background']
 weights: [2.0, 1.0]
 top_k: 50
-map_label_expand_size: 1
+map_label_expand_size: 0
