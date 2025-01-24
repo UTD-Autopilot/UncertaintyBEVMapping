@@ -125,13 +125,12 @@ def save_unc(u_score, u_true, out_path, score_name, true_name):
 
 
 def save_pred(pred, label, out_path, ego=False):
-    if pred.shape[1] != 2:
-        pred = map_rgb(pred[0], ego=ego)
-        label = map_rgb(label[0], ego=ego)
-        cv2.imwrite(os.path.join(out_path, "pred.png"), pred)
-        cv2.imwrite(os.path.join(out_path, "label.png"), label)
-
-        return pred, label
-    else:
-        cv2.imwrite(os.path.join(out_path, "pred.png"), pred[0, 0].detach().cpu().numpy() * 255)
-        cv2.imwrite(os.path.join(out_path, "label.png"), label[0, 0].detach().cpu().numpy() * 255)
+    for i in range(pred.shape[0]):
+        if pred.shape[1] != 2:
+            pred_rgb = map_rgb(pred[i], ego=ego)
+            label_rgb = map_rgb(label[i], ego=ego)
+            cv2.imwrite(os.path.join(out_path, "pred.png"), pred_rgb)
+            cv2.imwrite(os.path.join(out_path, "label.png"), label_rgb)
+        else:
+            cv2.imwrite(os.path.join(out_path, "pred.png"), pred[i, 0].detach().cpu().numpy() * 255)
+            cv2.imwrite(os.path.join(out_path, "label.png"), label[i, 0].detach().cpu().numpy() * 255)

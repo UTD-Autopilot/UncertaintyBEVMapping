@@ -14,6 +14,30 @@ from .models.view_transform import GridSampleVT
 from .models.autoencoder import SparseUNet
 from .models.layers.attention import PositionalEncodingMap
 
+from scipy.spatial.transform import Rotation as R
+
+def get_random_ref_matrix(trans_rot):
+    """
+    Use scipy to create a random reference transformation matrix.
+    """
+    trans_coeff, rot_coeff = trans_rot[:3], trans_rot[3:]
+
+    # Initialize in homogeneous coordinates.
+    mat = np.eye(4, dtype=np.float64)
+
+    # Translate
+    mat[:3, 3] = (np.random.random((3)).astype(np.float32) * 2 - 1) * np.array(
+        trans_coeff
+    )
+
+    # Rotate
+    random_zyx = (np.random.random((3)).astype(np.float32) * 2 - 1) * np.array(
+        rot_coeff
+    )
+    mat[:3, :3] = R.from_euler("zyx", random_zyx, degrees=True).as_matrix()
+
+    return mat
+
 class PointBEV(nn.Module):
     def __init__(
         self,
@@ -23,11 +47,14 @@ class PointBEV(nn.Module):
         n_classes=4,
     ):
         super().__init__()
+        self.n_classes = n_classes
         
-        keep_input_centr_offs = True
+        self.trans_rot = [30.,20.,0.,20.,0.,0.]
+
+        keep_input_centr_offs = False
         keep_input_binimg = True
         keep_input_hdmap = False
-        hdmap_names = ['drivable_area']
+        hdmap_names = ['vehicle', 'background']
         
         projector_shape = [200, 200, 8]
         out_c_base_neck = 128
@@ -141,21 +168,25 @@ class PointBEV(nn.Module):
             ),
             sampled_kwargs=dict(
                 N_coarse=2500,
+                # mode="dense",
                 mode="rnd_pillars",
                 val_mode="dense",
                 patch_size=1,
                 compress_height=False,
                 with_fine=True,
-                valid_fine=True,
+                valid_fine=False,
                 N_fine=2500,
                 N_anchor=100,
-                fine_patch_size=9,
-                fine_thresh=0.1,
+                fine_patch_size=7,
+                fine_thresh=0.2,
                 temp_thresh=-5,
+                reinject_pts=True,
             )
         )
+        self.bev_aug = nn.Parameter(torch.eye(4, dtype=torch.float32))
+        self.output_conv = nn.Conv2d(1, n_classes, 1)
 
-    
+
     def forward(self, images, intrinsics, extrinsics):
         device = images.device
         B, S, C, H, W = images.shape
@@ -170,9 +201,29 @@ class PointBEV(nn.Module):
         egoTin_to_seq = torch.eye(4, device=device)
         egoTin_to_seq = einops.repeat(egoTin_to_seq, 'X Y -> B 1 X Y', B=B)
 
-        bev_aug = torch.eye(4, device=device)
-        bev_aug = einops.repeat(bev_aug, 'X Y -> B 1 X Y', B=B)
+        # bev_aug = torch.eye(4, device=device)
+        bev_aug = einops.repeat(self.bev_aug, 'X Y -> B 1 X Y', B=B)
 
         dict_out = self.model(imgs, rots, trans, intrins, bev_aug, egoTin_to_seq)
-        bev_semantic = einops.rearrange(dict_out['bev']['binimg'], 'B 1 C H W -> B C H W')
+        
+        # # binimg
+        # bev_semantic = einops.rearrange(dict_out['bev']['binimg'], 'B 1 C H W -> B C H W')
+        # masks = dict_out['masks']['bev']['binimg']
+        # masks = einops.rearrange(masks, 'B 1 1 H W -> B H W')
+        # # masks = einops.repeat(masks, 'B H W -> B C H W', C=C)
+        # # Force masked region to be background, pre-sigmoid value
+        # bev_semantic[:, 0][masks == 0] = -5.0
+        # bev_semantic[:, 1][masks == 0] = 5.0
+        
+        # # hdmap
+        # bev_semantic = einops.rearrange(dict_out['bev']['hdmap'], 'B 1 C H W -> B C H W')
+        # masks = dict_out['masks']['bev']['hdmap']
+        # masks = einops.rearrange(masks, 'B 1 1 H W -> B H W')
+        # # masks = einops.repeat(masks, 'B H W -> B C H W', C=C)
+        # # Force masked region to be background, pre-sigmoid value
+        # bev_semantic[:, 0][masks == 0] = -5.0
+        # bev_semantic[:, 1][masks == 0] = 5.0
+
+        bev_semantic = einops.rearrange(dict_out['bev']['binimg'], 'B 1 1 H W -> B 1 H W')
+        bev_semantic = self.output_conv(bev_semantic)
         return bev_semantic

@@ -39,9 +39,9 @@ def train(config, dataroot, split='trainval'):
     train_set = config['train_set']
     val_set = config['val_set']
 
-    if config['backbone'] == 'lss' or config['backbone'] == 'simplebev' or config['backbone'] == 'pointbev':
+    if config['backbone'] == 'lss' or config['backbone'] == 'simplebev':
         yaw = 0
-    elif config['backbone'] == 'cvt':
+    elif config['backbone'] == 'cvt' or config['backbone'] == 'pointbev':
         yaw = 180
     else:
         raise NotImplementedError(f"yaw correction for backbone model {config['backbone']} not defined")
@@ -138,6 +138,8 @@ def train(config, dataroot, split='trainval'):
 
             t_0 = time()
             ood_loss = None
+            top_k_loss = None
+            ind_loss = None
 
             if config['ood']:
                 mapped_uncertainty = mapped_uncertainty.squeeze(1) # remove channel dim
@@ -150,22 +152,23 @@ def train(config, dataroot, split='trainval'):
                 outs = model(images, intrinsics, extrinsics)
                 ce = model.loss(outs, mapped_labels.to(model.device), reduction='none')
 
-                # Mapped labels will be extended to be larger than true labels in dataloader
-                mask = (mapped_labels[:, 0] == 1)
+                # # Mapped labels will be extended to be larger than true labels in dataloader
+                # mask = (mapped_labels[:, 0] == 1)
 
-                # apply standard CE loss for none mapped region
-                ce_loss = ce[~mask].mean()
+                # # apply standard CE loss for none mapped region
+                # ind_loss = ce[~mask].mean()
 
-                mapped_region_ce = ce[mask]
-                k = min(mapped_region_ce.shape[0], top_k * batch_size)
-                top_k_ce, top_k_idx = torch.topk(mapped_region_ce, k, largest=True)
-                # top_k_idx is an index for (b h w)
-                top_k_outs = torch.stack([outs[:, i][mask][top_k_idx] for i in range(channels)], dim=-1)
+                # mapped_region_ce = ce[mask]
+                # k = min(mapped_region_ce.shape[0], top_k * batch_size)
+                # top_k_ce, top_k_idx = torch.topk(mapped_region_ce, k, largest=True)
+                # # top_k_idx is an index for (b h w)
+                # top_k_outs = torch.stack([outs[:, i][mask][top_k_idx] for i in range(channels)], dim=-1)
 
-                # label 0 is vehicle
-                top_k_loss = top_k_criterion(top_k_outs, torch.full((top_k_outs.shape[0],), 0, dtype=torch.long, device=top_k_outs.device)).mean()
+                # # label 0 is vehicle
+                # top_k_loss = top_k_criterion(top_k_outs, torch.full((top_k_outs.shape[0],), 0, dtype=torch.long, device=top_k_outs.device)).mean()
 
-                loss = ce_loss + top_k_loss
+                # loss = ind_loss + top_k_loss
+                loss = ce.mean()
 
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), 5.0)
@@ -174,17 +177,18 @@ def train(config, dataroot, split='trainval'):
                 preds = model.activate(outs)
 
             step += 1
+            step_time = time() - t_0
 
             if scheduler is not None:
                 scheduler.step()
 
             if step % 50 == 0:
-                print(f"[{epoch}] {step} {loss.item()} {time()-t_0}")
+                print(f"[{epoch}] {step} loss: {loss.item()} time: {step_time}")
 
-                writer.add_scalar('train/step_time', time() - t_0, step)
+                writer.add_scalar('train/step_time', step_time, step)
                 writer.add_scalar('train/loss', loss, step)
-                writer.add_scalar('train/top_k_loss', top_k_loss, step)
-                # writer.add_scalar('train/ce_loss', ce_loss, step)
+                if top_k_loss is not None:
+                    writer.add_scalar('train/top_k_loss', top_k_loss, step)
 
                 if ood_loss is not None:
                     writer.add_scalar('train/ood_loss', ood_loss, step)
@@ -220,7 +224,7 @@ def train(config, dataroot, split='trainval'):
             writer.add_scalar('train/aupr', aupr, epoch)
             writer.add_scalar('train/auroc', auroc, epoch)
 
-        model.eval()
+        # model.eval()
 
         with torch.no_grad():
             total_loss = []
@@ -248,7 +252,7 @@ def train(config, dataroot, split='trainval'):
                     outs = model(images, intrinsics, extrinsics)
                     preds = model.activate(outs)
 
-                    ce = model.loss(outs, mapped_labels.to(model.device))
+                    ce = model.loss(outs, mapped_labels.to(model.device), reduction='none')
                     mask = (mapped_labels[:, 0] == 1)
                     ce_loss = ce[~mask].mean()
 
@@ -283,7 +287,7 @@ def train(config, dataroot, split='trainval'):
 
                 iou = get_iou(preds, labels)
 
-                print(f'[{epoch}] {step} IOU: {iou}')
+                print(f'Test [{epoch}] {step} IOU: {iou}')
 
                 for i in range(0, n_classes):
                     total_ious[i].append(iou[i])

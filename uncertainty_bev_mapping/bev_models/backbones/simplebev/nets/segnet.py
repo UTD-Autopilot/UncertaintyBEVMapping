@@ -281,7 +281,8 @@ class Encoder_eff(nn.Module):
         return x
 
 class Segnet(nn.Module):
-    def __init__(self, Z, Y, X, vox_util=None, 
+    def __init__(self, Z, Y, X, n_classes,
+                 vox_util=None, 
                  use_radar=False,
                  use_lidar=False,
                  use_metaradar=False,
@@ -350,7 +351,7 @@ class Segnet(nn.Module):
         # Decoder
         self.decoder = Decoder(
             in_channels=latent_dim,
-            n_classes=1,
+            n_classes=n_classes,
             predict_future_flow=False
         )
 

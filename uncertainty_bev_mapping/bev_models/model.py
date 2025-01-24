@@ -69,7 +69,7 @@ class Model(nn.Module):
         }
 
     def load(self, state_dict):
-        self.load_state_dict(state_dict['model_state_dict'])
+        self.load_state_dict(state_dict['model_state_dict'], strict=False)
 
         if self.opt is not None:
             self.opt.load_state_dict(state_dict['optimizer_state_dict'])

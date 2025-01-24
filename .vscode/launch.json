@@ -22,27 +22,40 @@
             ]
         },
         {
-            "name": "train_bev_topk2_model.py configs/topk2/nuscenes_pointbev_evidential_topk2_vehicle.yaml",
+            "name": "train_bev_topk2_model.py configs/topk2/nuscenes_pointbev_evidential_topk2_vehicle_d1.yaml",
             "type": "debugpy",
             "request": "launch",
             "program": "scripts/train_bev_topk2_model.py",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "args": [
-                "configs/topk2/nuscenes_pointbev_evidential_topk2_vehicle.yaml",
+                "configs/topk2/nuscenes_pointbev_evidential_topk2_vehicle_d1.yaml",
                 "-g",
                 "0", "1"
             ]
         },
         {
-            "name": "train_bev_topk2_model.py configs/topk2/nuscenes_pointbev_baseline_vehicle.yaml",
+            "name": "train_bev_topk2_model.py configs/topk2/carla_pointbev_baseline_vehicle_d1.yaml",
             "type": "debugpy",
             "request": "launch",
             "program": "scripts/train_bev_topk2_model.py",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "args": [
-                "configs/topk2/nuscenes_pointbev_baseline_vehicle.yaml",
+                "configs/topk2/carla_pointbev_baseline_vehicle_d1.yaml",
+                "-g",
+                "0", "1"
+            ]
+        },
+        {
+            "name": "train_bev_topk2_model.py configs/topk2/nuscenes_pointbev_baseline_vehicle_d1.yaml",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/train_bev_topk2_model.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": [
+                "configs/topk2/nuscenes_pointbev_baseline_vehicle_d1.yaml",
                 "-g",
                 "0", "1"
             ]

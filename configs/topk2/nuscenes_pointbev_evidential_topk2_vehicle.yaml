@@ -5,7 +5,7 @@ dataset: nuscenes
 train_set: train_comb
 val_set: val_comb
 logdir: outputs/nuscenes/pointbev_evidential_topk2_vehicle
-batch_size: 16
+batch_size: 8
 learning_rate: 0.01
 weight_decay: 0.0000001
 num_epochs: 40

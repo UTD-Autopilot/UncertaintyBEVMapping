@@ -5,7 +5,7 @@ train_set: train
 val_set: val
 logdir: outputs/carla/pointbev_baseline_vehicle
 batch_size: 16
-learning_rate: 0.001
+learning_rate: 0.01
 weight_decay: 0.0000001
 num_epochs: 20
 loss: ce
@@ -14,5 +14,6 @@ pos_class: 'vehicle'
 n_classes: 2
 classes: ['vehicle', 'background']
 weights: [2.0, 1.0]
-top_k: 50
+top_k: 800
 map_label_expand_size: 0
+pretrained: outputs/carla/pointbev_baseline_vehicle_2/10.pt

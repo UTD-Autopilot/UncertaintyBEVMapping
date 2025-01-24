@@ -47,7 +47,7 @@ class SimpleBEV(nn.Module):
         )
         
         self.model = Segnet(
-            Z, Y, X,
+            Z, Y, X, n_classes,
             self.vox_util,
             use_radar=False,
             use_lidar=False,
@@ -91,4 +91,5 @@ class SimpleBEV(nn.Module):
             vox_util=self.vox_util,
             rad_occ_mem0=None,
         )
-        return seg_bev_e
+        bev_pred = flip_seg_e = torch.flip(seg_bev_e, dims=[-1])
+        return bev_pred

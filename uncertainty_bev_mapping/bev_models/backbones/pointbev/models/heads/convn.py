@@ -111,7 +111,8 @@ class BEVConvHead(nn.Module):
 
         # Initialize heads.
         if with_binimg:
-            map_out.update({"binimg": deepcopy(convnormact_conv_cn)})
+            # map_out.update({"binimg": deepcopy(convnormact_conv_cn)})
+            map_out.update({"binimg": deepcopy(convnormact_conv_c1)})
 
         if with_centr_offs:
             map_out.update(

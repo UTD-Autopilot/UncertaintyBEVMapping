@@ -152,11 +152,13 @@ class NuScenesDataset(torch.utils.data.Dataset):
 
             adjust_yaw = Rotation.from_euler('z', [self.yaw], degrees=True)
             sensor_rotation = Rotation.from_quat([q[1], q[2], q[3], q[0]]).inv() * adjust_yaw
+            sensor_rotation = sensor_rotation.as_matrix()
+            # sensor_rotation = Quaternion(sensor_sample['rotation']).rotation_matrix
 
             sensor_translation = np.array(sensor_sample['translation'])
 
             extrinsic = np.eye(4, dtype=np.float32)
-            extrinsic[:3, :3] = sensor_rotation.as_matrix()
+            extrinsic[:3, :3] = sensor_rotation
             extrinsic[:3, 3] = sensor_translation
             extrinsic = np.linalg.inv(extrinsic)
 
